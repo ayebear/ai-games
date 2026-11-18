@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  PLANTS, PLACEABLES, TOOLS, BAGS, BASE_CAP, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, SOIL, HALF, HEART_R,
+  PLANTS, PLACEABLES, TOOLS, BAGS, BASE_CAP, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, DEW_SPRAY, SOIL, HALF, HEART_R,
   MULCH_HEAL, DEW_WATER, WEED_NEAR, itemInfo, isSellable, isLoot, sellEach, itemWeight, toolBase,
 } from './config.js';
 import { invIconHTML } from './icons.js';
@@ -32,7 +32,7 @@ export class Player {
     this.inv = [HANDS()];
     this.sel = 0;
     this.bag = null; // worn bag (BAGS key), null = just pockets
-    this.can = 0; this.spray = 0; this.canT = 0; this.canFxT = 0;
+    this.can = 0; this.spray = 0; this.canT = 0; this.sprayT = 0; this.canFxT = 0;
     this.swingT = 0; this.cool = 0; this.holdT = 0; this.holdTarget = null; this.holdMax = 1;
     this.stall = null; this.sellAct = null; this.stun = 0; this.kv = new THREE.Vector3(); this.leaveT = 0; this.t = 0;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
@@ -274,7 +274,7 @@ export class Player {
 
     this.useTool(dt, inp);
     this.collectCoins(dt);
-    this.fillCan(dt);
+    this.fillWater(dt);
     this.animate(dt, mag);
   }
 
@@ -658,7 +658,7 @@ export class Player {
         }
         break;
       case 'can':
-        // the can refills itself (see fillCan), so X always pours
+        // the can refills itself (see fillWater), so X always pours
         if (held) {
           if (this.can <= 0) { if (pressed) sfx('error'); break; }
           this.pouring = true;
@@ -692,10 +692,8 @@ export class Player {
         }
         break;
       case 'spray':
-        if (pressed && this.nearWater()) {
-          this.spray = SPRAY_CAP;
-          this.say('Soap refilled!', '#f8bbd0'); sfx('splash');
-        } else if (held && this.cool <= 0) {
+        // the sprayer refills itself (see fillWater), so X always sprays
+        if (held && this.cool <= 0) {
           if (this.spray <= 0) { if (pressed) sfx('error'); break; }
           this.cool = 0.14; this.spray--;
           const tp = this.toolPos();
@@ -757,7 +755,7 @@ export class Player {
       case 'axe': return this.treeInFront() ? 'Chop tree' : 'Chop';
       case 'can': return this.can > 0 ? 'Hold: water' : 'Can empty';
       case 'swatter': return 'Swat';
-      case 'spray': return this.nearWater() ? 'Refill soap' : this.spray > 0 ? 'Hold: spray' : 'Sprayer empty';
+      case 'spray': return this.spray > 0 ? 'Hold: spray' : 'Sprayer empty';
       case 'slingshot': return 'Fling pebble';
       case 'gun': return 'Fire spud';
       case 'mgun': return this.overheat ? 'Overheated' : 'Hold: fire';
@@ -770,7 +768,7 @@ export class Player {
   toolBlocked() {
     switch (this.tool) {
       case 'can': return this.can <= 0;
-      case 'spray': return !this.nearWater() && this.spray <= 0;
+      case 'spray': return this.spray <= 0;
       case 'mgun': return !!this.overheat;
       case 'hose': return this.hoseTooFar();
     }
@@ -820,45 +818,60 @@ export class Player {
     this.hose.quaternion.setFromUnitVectors(UP, d);
   }
 
-  // A Watering Can fills itself, held or not: it tops up at the pond or a Rain Barrel, soaks up the
-  // dew in your bag, and pulls in dew drops you walk near. Each drop adds DEW_WATER (the last one
-  // may overflow). The can meter shows for a moment whenever this happens.
-  fillCan(dt) {
-    this.canT -= dt; this.canFxT -= dt;
-    if (!this.toolLike('can')) return;
-    const cap = this.canCap, room = () => cap - this.can > 1e-6;
-    if (!room()) return;
+  // A Watering Can and Soap Sprayer fill themselves, held or not: they top up at the pond or a Rain
+  // Barrel, soak up the dew in your bag, and pull in dew drops you walk near. Dew goes to the can
+  // first (DEW_WATER per drop) and to the sprayer (DEW_SPRAY shots) once the can can't fit another
+  // drop. A drop is only taken when the whole drop fits (no overflow), so extra dew stays in your
+  // bag or on the ground. The meter shows for a moment whenever this happens.
+  fillWater(dt) {
+    this.canT -= dt; this.sprayT -= dt; this.canFxT -= dt;
+    const hasCan = !!this.toolLike('can'), hasSpray = !!this.toolLike('spray');
+    if (!hasCan && !hasSpray) return;
+    const cap = this.canCap;
+    const canFits = () => hasCan && cap - this.can >= DEW_WATER - 1e-6;
+    const sprayFits = () => hasSpray && SPRAY_CAP - this.spray >= DEW_SPRAY;
     if (this.nearWater()) {
-      const gain = cap - this.can;
-      this.can = cap; this.canT = 1.5;
-      if (gain > 0.4 && this.canFxT <= 0) {
+      const canGain = hasCan ? cap - this.can : 0, sprayGain = hasSpray ? SPRAY_CAP - this.spray : 0;
+      if (canGain <= 1e-6 && sprayGain <= 0) return;
+      if (hasCan) { this.can = cap; if (canGain > 1e-6) this.canT = 1.5; }
+      if (hasSpray) { this.spray = SPRAY_CAP; if (sprayGain > 0) this.sprayT = 1.5; }
+      const bigCan = canGain > 0.4, bigSpray = sprayGain >= 5;
+      if ((bigCan || bigSpray) && this.canFxT <= 0) {
         this.canFxT = 2;
-        G.fx.burst({ x: this.pos.x, y: 0.8, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
-        G.fx.text(this.pos, 'Can refilled!', '#81d4fa', 14);
+        G.fx.burst({ x: this.pos.x, y: 0.8, z: this.pos.z }, bigCan ? 0x4fc3f7 : 0xf8bbd0, 12, { speed: 3 });
+        G.fx.text(this.pos, bigCan && bigSpray ? 'Can & soap refilled!' : bigCan ? 'Can refilled!' : 'Soap refilled!', bigCan ? '#81d4fa' : '#f8bbd0', 14);
         sfx('splash');
       }
       return;
     }
-    let drops = 0;
-    const absorb = () => { this.can = Math.min(cap, this.can + DEW_WATER); drops++; };
-    for (let s = this.stack('dew'); s && room(); s = this.stack('dew')) { this.take(s); absorb(); }
+    if (!canFits() && !sprayFits()) return;
+    let canDrops = 0, sprayDrops = 0;
+    // returns false when neither can nor sprayer has room for a whole drop
+    const absorb = () => {
+      if (canFits()) { this.can = Math.min(cap, this.can + DEW_WATER); canDrops++; return true; }
+      if (sprayFits()) { this.spray += DEW_SPRAY; sprayDrops++; return true; }
+      return false;
+    };
+    for (let s = this.stack('dew'); s && (canFits() || sprayFits()); s = this.stack('dew')) { this.take(s); absorb(); }
     for (const p of G.pickups) {
-      if (!room()) break;
+      if (!canFits() && !sprayFits()) break;
       if (p.dead || p.kind !== 'dew' || p.noPick > 0) continue;
       const d = dist2(p.pos, this.pos);
       if (d < 0.9) {
-        for (let n = 0; n < p.count && room(); n++) absorb();
-        removePickup(p);
+        while (p.count > 0 && absorb()) p.count--;
+        if (p.count <= 0) removePickup(p);
       } else if (d < 2.6) {
         const k = Math.min(1, dt * 7);
         p.pos.x += (this.pos.x - p.pos.x) * k;
         p.pos.z += (this.pos.z - p.pos.z) * k;
       }
     }
-    if (drops) {
-      this.canT = 1.5;
-      G.fx.burst({ x: this.pos.x, y: 0.9, z: this.pos.z }, 0x4fc3f7, 6, { speed: 2 });
-      G.fx.text(this.pos, `+${drops > 1 ? drops + '×' : ''}💧 can`, '#81d4fa', 13);
+    if (canDrops || sprayDrops) {
+      if (canDrops) this.canT = 1.5;
+      if (sprayDrops) this.sprayT = 1.5;
+      G.fx.burst({ x: this.pos.x, y: 0.9, z: this.pos.z }, canDrops ? 0x4fc3f7 : 0xf8bbd0, 6, { speed: 2 });
+      const part = (n, what) => `+${n > 1 ? n + '×' : ''}💧 ${what}`;
+      G.fx.text(this.pos, [canDrops && part(canDrops, 'can'), sprayDrops && part(sprayDrops, 'soap')].filter(Boolean).join('  '), canDrops ? '#81d4fa' : '#f8bbd0', 13);
       sfx('splash', 0.15);
     }
   }

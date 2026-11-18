@@ -168,7 +168,7 @@ export class HUD {
     const tool = p.tool;
     let meter = '';
     if (tool === 'can' || p.canT > 0) meter = this.meter('💧', p.can / p.canCap, '#4fc3f7');
-    if (tool === 'spray') meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
+    if (tool === 'spray' || (tool !== 'can' && p.sprayT > 0)) meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
     if (tool === 'mgun') meter = this.meter(p.overheat ? '🔥' : '🌡️', p.heat || 0, p.overheat ? '#ff5252' : '#ffb74d');
     const h = p.held;
     const name = h.kind === 'hands' ? TOOLS.hands.name : itemInfo(h.kind).name;

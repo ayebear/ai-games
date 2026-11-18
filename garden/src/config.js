@@ -88,7 +88,7 @@ export const TOOLS = {
   hose: { name: 'Garden Hose', icon: '🌊', weight: 2, cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
   soaphose: { name: 'Soap Hose', icon: '🧼', weight: 2, base: 'hose', cost: 160, unlock: 6, model: { soap: true }, desc: 'A Garden Hose whose spray also kills mites and burns slugs.' },
   swatter: { name: 'Fly Swatter', icon: '🏓', weight: 1, cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
-  spray: { name: 'Soap Sprayer', icon: '🧴', weight: 1, cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
+  spray: { name: 'Soap Sprayer', icon: '🧴', weight: 1, cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refills itself at the pond and soaks up dew.' },
   slingshot: { name: 'Slingshot', icon: '🪃', weight: 1, cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
   axe: { name: 'Axe', icon: '🪓', weight: 2, cost: 60, unlock: 3, weapon: true, desc: 'Fells a tree in one chop. Slow, but one-hits almost any pest.' },
   gun: { name: 'Spud Gun', icon: '🥔', weight: 2, cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
@@ -100,6 +100,8 @@ export const toolBase = (key) => TOOLS[key]?.base ?? key;
 export const CAN_CAP = 4;
 export const DEW_WATER = 0.3;
 export const SPRAY_CAP = 25;
+// Soap Sprayer shots one dew drop is worth (the sprayer fills from the pond and dew like the can).
+export const DEW_SPRAY = 4;
 
 // ───────────────────────── Bags (per player, worn) ─────────────────────────
 // Every gnome starts with pockets that hold BASE_CAP. A bag replaces the one you wear (half price

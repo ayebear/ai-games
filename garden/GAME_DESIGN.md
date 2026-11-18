@@ -294,10 +294,12 @@ spud guns and the Axe 2, the Seed Blaster 3.
 | Garden Hose | 4 | $90 | Endless water from the spigot (tethered, limited reach) · **blasts pests back** · careful, it can **overwater** |
 | Soap Hose | 6 | $160 | A Garden Hose whose spray also kills mites and burns slugs |
 
-**The can fills itself.** Owning a can is enough, you don't need it in your hands: walking up to
-the pond or a Rain Barrel tops it up, dew in your bag pours into it, and dew drops on the ground get
-pulled in as you walk near. Each drop adds 0.3 even if that overflows the can, so the last drop can
-waste a little. A splash, a "+💧 can" text and the can meter in your panel show when it happens.
+**The can and the Soap Sprayer fill themselves.** Owning one is enough, you don't need it in your
+hands: walking up to the pond or a Rain Barrel tops both up, dew in your bag pours into them, and dew
+drops on the ground get pulled in as you walk near. Dew goes to the **can first** (0.3 water per
+drop); once the can can't fit another drop, it goes to the **sprayer** (4 shots per drop). A drop
+only goes in when the whole drop fits, so nothing overflows: any extra dew stays in your bag (or on
+the ground) for later. A splash, a "+💧 can" or "+💧 soap" text and the meter in your panel show when it happens.
 Water in the can weighs nothing, so a can frees up bag space compared to carrying dew.
 
 **Pest Control** shop:
@@ -305,7 +307,7 @@ Water in the can weighs nothing, so a can frees up bag space compared to carryin
 | Tool | Day | Cost | Uses |
 |---|---|---|---|
 | Fly Swatter | 1 | $6 | One-hit flies and moths · scatters crows · knocks mites off plants |
-| Soap Sprayer | 2 | $25 | **Kills mites** · burns slugs · refills with water |
+| Soap Sprayer | 2 | $25 | **Kills mites** · burns slugs · holds 25 shots · **fills itself** like the can (above) |
 | Slingshot | 3 | $30 | Quick pebble shots; great for flies and crows at range |
 | Axe | 3 | $60 | **Fells a tree** in one chop (3 wood) · a slow (1.1 s), huge melee hit (30 damage) that one-hits every pest on the ground except the Moon Stag · can't reach flying pests |
 | Spud Gun | 3 | $60 | Long-range potatoes: the **deer stopper** |
