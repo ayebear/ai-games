@@ -23,6 +23,7 @@ export const G = {
   enemies: [],
   pickups: [],
   placeables: [],
+  trees: [],
   projectiles: [],
   flashes: [], // temporary light/stun sources {x,z,r,t}
   heart: null,

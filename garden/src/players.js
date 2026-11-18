@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   PLANTS, PLACEABLES, TOOLS, BAGS, BASE_CAP, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, SOIL, HALF, HEART_R,
-  MULCH_HEAL, itemInfo, isSellable, isLoot, sellEach, itemWeight, toolBase,
+  MULCH_HEAL, DEW_WATER, WEED_NEAR, itemInfo, isSellable, isLoot, sellEach, itemWeight, toolBase,
 } from './config.js';
 import { invIconHTML } from './icons.js';
 import { G, clamp, dist2, rand, activePlayers } from './state.js';
@@ -32,7 +32,7 @@ export class Player {
     this.inv = [HANDS()];
     this.sel = 0;
     this.bag = null; // worn bag (BAGS key), null = just pockets
-    this.can = 0; this.spray = 0;
+    this.can = 0; this.spray = 0; this.canT = 0; this.canFxT = 0;
     this.swingT = 0; this.cool = 0; this.holdT = 0; this.holdTarget = null; this.holdMax = 1;
     this.stall = null; this.sellAct = null; this.stun = 0; this.kv = new THREE.Vector3(); this.leaveT = 0; this.t = 0;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
@@ -75,7 +75,10 @@ export class Player {
         if (t === 'shovel') {
           const tc = this.targetCell();
           if (tc && tc.weed) { at = tc.weed.mesh.position; r = 0.5; }
-          else if (tc && (tc.type === 'grass' || tc.type === 'plot')) { at = tc; shape = 'sq'; }
+          else if (tc && (tc.type === 'grass' || (tc.type === 'plot' && !tc.plant))) { at = tc; shape = 'sq'; }
+        } else if (t === 'axe') {
+          const tr = this.treeInFront();
+          if (tr) { at = tr.pos; r = 0.9; }
         } else if (t === 'can' || t === 'spray' || t === 'swatter' || t === 'hose') at = this.plantInFront();
       }
     }
@@ -116,7 +119,7 @@ export class Player {
   get tool() { const k = this.toolKey; return k ? toolBase(k) : 'item'; }
   get toolKeys() { return this.inv.filter((s) => isTool(s.kind)).map((s) => s.kind.slice(5)); }
   hasTool(key) { return this.inv.some((s) => s.kind === 'tool:' + key); }
-  get canCap() { return CAN_CAP * (this.hasTool('goldcan') ? 2 : 1); }
+  get canCap() { const c = this.toolLike('can'); return c ? CAN_CAP * (TOOLS[c.kind.slice(5)].cap ?? 1) : CAN_CAP; }
 
   say(text, color = '#fff') {
     if (this.msgT > 0) return;
@@ -271,6 +274,7 @@ export class Player {
 
     this.useTool(dt, inp);
     this.collectCoins(dt);
+    this.fillCan(dt);
     this.animate(dt, mag);
   }
 
@@ -310,6 +314,17 @@ export class Player {
       if (da > 1.05) continue;
       const s = d + da * 1.6;
       if (s < bs) { bs = s; best = p; }
+    }
+    return best;
+  }
+  // A standing tree in front of you, close enough to chop.
+  treeInFront() {
+    let best = null, bd = Infinity;
+    for (const t of G.trees) {
+      if (!t.standing) continue;
+      const dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, d = Math.hypot(dx, dz);
+      if (d > 2.3 || (d > 0.9 && Math.abs(angDiff(Math.atan2(dx, dz), this.facing)) > 0.9)) continue;
+      if (d < bd) { bd = d; best = t; }
     }
     return best;
   }
@@ -407,9 +422,12 @@ export class Player {
     const plant = this.plantInFront();
     const no = (label) => ({ label, off: true });
     switch (k) {
-      case 'seed':
+      case 'seed': {
+        const wc = plot && !plot.plant ? G.world.weedNear(plot.x, plot.z, WEED_NEAR) : null;
+        if (wc) return { at: wc.weed.mesh.position, label: 'Pull the weed first', off: true };
         if (plot && !plot.plant) return { at: plot, sq: true, label: `Plant ${PLANTS[sub].name}`, run: () => this.plantSeed(plot, sub) };
         return no('Face an empty plot');
+      }
       case 'soil':
         if (plot && plot.soil < 3) return { at: plot, sq: true, label: `Add soil → ${SOIL[plot.soil + 1].name}`, run: () => this.addSoil(plot) };
         return no(plot ? 'Best soil already' : 'Face a plot');
@@ -632,16 +650,16 @@ export class Player {
               this.stats.tilled++;
               G.fx.burst({ x: tc.x, y: 0.2, z: tc.z }, 0x6d4c2f, 12, { speed: 3 });
               sfx('till');
+            } else if (tc && G.world.untill(tc)) {
+              G.fx.burst({ x: tc.x, y: 0.2, z: tc.z }, 0x5c9634, 12, { speed: 3 });
+              sfx('till');
             }
           }
         }
         break;
       case 'can':
-        if (pressed && this.nearWater()) {
-          this.can = this.canCap;
-          G.fx.burst({ x: this.pos.x, y: 0.5, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
-          this.say('Filled!', '#81d4fa'); sfx('splash');
-        } else if (held && !this.nearWater()) {
+        // the can refills itself (see fillCan), so X always pours
+        if (held) {
           if (this.can <= 0) { if (pressed) sfx('error'); break; }
           this.pouring = true;
           const rate = (this.toolKey === 'goldcan' ? 1.0 : 0.6) * dt;
@@ -656,6 +674,13 @@ export class Player {
           G.fx.stream(tp, aim, 0x4fc3f7, { speed: 3.5, life: 0.4 });
           sfx('water', 0.25);
           this.cone(1.8, 0.6, (e, k) => { if (k === 'enemy' && (e.type === 'fly' || e.type === 'moth')) e.hit(3 * dt, this, 0, 0, true); });
+        }
+        break;
+      case 'axe':
+        // slow, heavy chop: one-hits almost any pest; with no pest in reach it fells the tree in front
+        if (pressed && this.cool <= 0) {
+          this.cool = 1.1; this.swingT = 0.3; sfx('swing');
+          if (!this.melee(2.0, 1.0, 30, 12, 'axe')) this.treeInFront()?.chop(this.pos);
         }
         break;
       case 'swatter':
@@ -728,8 +753,9 @@ export class Player {
   toolLabel(tc) {
     switch (this.tool) {
       case 'hands': return 'Punch';
-      case 'shovel': return tc && tc.weed ? 'Dig weed' : tc && tc.type === 'grass' && !tc.placeable && Math.hypot(tc.x, tc.z) > 3.5 ? 'Till plot' : 'Bonk';
-      case 'can': return this.nearWater() ? 'Fill can' : this.can > 0 ? 'Hold: water' : 'Can empty';
+      case 'shovel': return tc && tc.weed ? 'Dig weed' : tc && tc.type === 'grass' && !tc.placeable && Math.hypot(tc.x, tc.z) > 3.5 ? 'Till plot' : tc && tc.type === 'plot' && !tc.plant ? 'Fill in plot' : 'Bonk';
+      case 'axe': return this.treeInFront() ? 'Chop tree' : 'Chop';
+      case 'can': return this.can > 0 ? 'Hold: water' : 'Can empty';
       case 'swatter': return 'Swat';
       case 'spray': return this.nearWater() ? 'Refill soap' : this.spray > 0 ? 'Hold: spray' : 'Sprayer empty';
       case 'slingshot': return 'Fling pebble';
@@ -743,7 +769,7 @@ export class Player {
   // X does nothing right now (shown greyed out).
   toolBlocked() {
     switch (this.tool) {
-      case 'can': return !this.nearWater() && this.can <= 0;
+      case 'can': return this.can <= 0;
       case 'spray': return !this.nearWater() && this.spray <= 0;
       case 'mgun': return !!this.overheat;
       case 'hose': return this.hoseTooFar();
@@ -792,6 +818,49 @@ export class Player {
     this.hose.position.copy(a).addScaledVector(d.normalize(), L / 2);
     this.hose.scale.set(0.06, L, 0.06);
     this.hose.quaternion.setFromUnitVectors(UP, d);
+  }
+
+  // A Watering Can fills itself, held or not: it tops up at the pond or a Rain Barrel, soaks up the
+  // dew in your bag, and pulls in dew drops you walk near. Each drop adds DEW_WATER (the last one
+  // may overflow). The can meter shows for a moment whenever this happens.
+  fillCan(dt) {
+    this.canT -= dt; this.canFxT -= dt;
+    if (!this.toolLike('can')) return;
+    const cap = this.canCap, room = () => cap - this.can > 1e-6;
+    if (!room()) return;
+    if (this.nearWater()) {
+      const gain = cap - this.can;
+      this.can = cap; this.canT = 1.5;
+      if (gain > 0.4 && this.canFxT <= 0) {
+        this.canFxT = 2;
+        G.fx.burst({ x: this.pos.x, y: 0.8, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
+        G.fx.text(this.pos, 'Can refilled!', '#81d4fa', 14);
+        sfx('splash');
+      }
+      return;
+    }
+    let drops = 0;
+    const absorb = () => { this.can = Math.min(cap, this.can + DEW_WATER); drops++; };
+    for (let s = this.stack('dew'); s && room(); s = this.stack('dew')) { this.take(s); absorb(); }
+    for (const p of G.pickups) {
+      if (!room()) break;
+      if (p.dead || p.kind !== 'dew' || p.noPick > 0) continue;
+      const d = dist2(p.pos, this.pos);
+      if (d < 0.9) {
+        for (let n = 0; n < p.count && room(); n++) absorb();
+        removePickup(p);
+      } else if (d < 2.6) {
+        const k = Math.min(1, dt * 7);
+        p.pos.x += (this.pos.x - p.pos.x) * k;
+        p.pos.z += (this.pos.z - p.pos.z) * k;
+      }
+    }
+    if (drops) {
+      this.canT = 1.5;
+      G.fx.burst({ x: this.pos.x, y: 0.9, z: this.pos.z }, 0x4fc3f7, 6, { speed: 2 });
+      G.fx.text(this.pos, `+${drops > 1 ? drops + '×' : ''}💧 can`, '#81d4fa', 13);
+      sfx('splash', 0.15);
+    }
   }
 
   collectCoins(dt) {

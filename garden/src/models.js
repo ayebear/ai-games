@@ -118,6 +118,16 @@ export function makeTool(key, opts = {}) {
       P(g, CYL(8, 1), c, [0, 0.39, 0.44], [0.08, 0.06, 0.08], [0.95, 0, 0]); // rose
       break;
     }
+    case 'axe': {
+      // long hickory haft, a heavy wedge head with a bright edge
+      P(g, CYL(6), mat(WOOD), [0, 0.42, 0], [0.04, 1.1, 0.04]);
+      P(g, CYL(6), mat(0x5d3a1a), [0, -0.08, 0], [0.05, 0.12, 0.05]); // grip end
+      const head = mat(0x607d8b, { metalness: 0.6, roughness: 0.4 });
+      P(g, BOX(), head, [0.1, 0.9, 0], [0.26, 0.2, 0.07]);
+      P(g, BOX(), mat(0xeceff1, { metalness: 0.85, roughness: 0.15 }), [0.25, 0.9, 0], [0.05, 0.3, 0.05]); // edge
+      P(g, BOX(), head, [-0.06, 0.9, 0], [0.09, 0.12, 0.09]); // poll
+      break;
+    }
     case 'swatter':
       P(g, CYL(6), mat(0xeeeeee), [0, 0.3, 0], [0.025, 0.65, 0.025]);
       P(g, BOX(), mat(0xe53935), [0, 0.78, 0], [0.36, 0.36, 0.025]);
@@ -689,6 +699,11 @@ export function makeItem(kind) {
       P(g, SPH(6, 4), mat(0xf6c9a4), [0.03, 0.14, 0.3], 0.035);
       break;
     }
+    case 'wood':
+      // a short split log with pale cut ends
+      P(g, CYL(10), mat(0x7a5230), [0, 0.13, 0], [0.13, 0.5, 0.13], [Math.PI / 2, 0, 0.3]);
+      for (const s of [-1, 1]) P(g, CYL(10), mat(0xe0b97a), [s * 0.074, 0.13, s * 0.24], [0.11, 0.012, 0.11], [Math.PI / 2, 0, 0.3]);
+      break;
     case 'dew': {
       const water = mat(0x7fdcff, { transparent: true, opacity: 0.8, roughness: 0.05, emissive: 0x1a6a8a, emissiveIntensity: 0.7 });
       P(g, SPH(14, 10), water, [0, 0.2, 0], 0.17);
@@ -784,6 +799,23 @@ export function makeItem(kind) {
 }
 
 // ───────────────────────── Environment bits ─────────────────────────
+// A choppable tree (same look as the forest ring): trunk plus a pine cone or a round canopy.
+// `top` is everything above the stump, so it can tip over when felled.
+export function makeTree(pine) {
+  const g = new THREE.Group();
+  const top = new THREE.Group();
+  g.add(top);
+  P(g, CYL(7), mat(0x6d4c2f), [0, 0.2, 0], [0.34, 0.4, 0.34]); // stump
+  P(g, CYL(7), mat(0xe0b97a), [0, 0.405, 0], [0.3, 0.01, 0.3], [0, 0, 0], false); // its cut face
+  P(top, CYL(6, 0.7), mat(0x6d4c2f), [0, 1.2, 0], [0.3, 1.7, 0.3]);
+  if (pine) {
+    P(top, CONE(7), mat(0x2f6b3a, { flat: true }), [0, 3.2, 0], [1.4, 3.2, 1.4]);
+    P(top, CONE(7), mat(0x377a42, { flat: true }), [0, 4.3, 0], [1.0, 2.2, 1.0]);
+  } else P(top, ICO(0), mat(0x4a8f3a, { flat: true }), [0, 3.1, 0], 1.6);
+  return { group: g, top };
+}
+
+
 // Weeds are dandelions: broad, dark jagged leaves with a bright yellow puff on a tall stem, so they
 // read as "pull me" against the short, ground-colored grass.
 export function makeWeed() {

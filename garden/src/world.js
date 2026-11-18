@@ -19,7 +19,7 @@ export class World {
         } else if (i >= MARKET.plaza.i0 && i <= MARKET.plaza.i1 && j === MARKET.plaza.j) type = 'plaza'; // in front of the quick-sell counter
         else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
         else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'fixture'; // heart bloom (round collider below)
-        this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null });
+        this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null, tree: null });
       }
     }
     this.cellAt(SPIGOT.x, SPIGOT.z).type = 'fixture'; // no tilling or gadgets; round collider below
@@ -38,6 +38,7 @@ export class World {
       { x: POND.x, z: POND.z, r: POND.r - 0.3 },
     ];
     for (const p of G.placeables) if (!p.dead && p.def.blocks && !Array.isArray(p.def.hit)) out.push({ x: p.pos.x, z: p.pos.z, r: p.def.hit ?? 0.6 });
+    for (const t of G.trees) if (t.standing) out.push({ x: t.pos.x, z: t.pos.z, r: t.radius });
     return out;
   }
   walkable(x, z, r = 0.4) {
@@ -74,6 +75,14 @@ export class World {
     this.refreshPlot(c);
   }
 
+  // Shovel on an empty plot: back to grass (its soil upgrades are lost).
+  untill(c) {
+    if (c.type !== 'plot' || c.plant || c.weed || c.placeable) return false;
+    if (c.plot) this.scene.remove(c.plot);
+    c.plot = null; c.type = 'grass'; c.soil = 0; c.wet = 0;
+    return true;
+  }
+
   refreshPlot(c) {
     if (!c.plot) return;
     const col = new THREE.Color(SOIL[c.soil].color);
@@ -96,6 +105,21 @@ export class World {
     if (!c.weed) return;
     this.scene.remove(c.weed.mesh);
     c.weed = null;
+  }
+
+  // The weed closest to (x, z) within r, or null. Weeds sit inside their cell, so only the 3×3
+  // block of cells around the point can hold one that close (r ≤ CELL).
+  weedNear(x, z, r) {
+    const c0 = this.cellAt(x, z);
+    if (!c0) return null;
+    let best = null, bd = r;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const c = this.cell(c0.i + di, c0.j + dj);
+      if (!c || !c.weed) continue;
+      const d = Math.hypot(c.weed.mesh.position.x - x, c.weed.mesh.position.z - z);
+      if (d < bd) { bd = d; best = c; }
+    }
+    return best;
   }
 
   randomCell(filter, tries = 200) {

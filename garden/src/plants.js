@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLANTS, SOIL, HEART_R, REGROW_AT } from './config.js';
+import { PLANTS, SOIL, HEART_R, REGROW_AT, WEED_CHOKE } from './config.js';
 import { G, clamp, dist2, rand, wx } from './state.js';
 import { makePlantModel, makeHeart, P, SPH, mat } from './models.js';
 import { sfx } from './audio.js';
@@ -86,10 +86,13 @@ export class Plant {
     if (this.stage < 4) this.growth += (dt / d.grow) * rate;
     else if (this.size < d.maxSize) this.size = Math.min(d.maxSize, this.size + (dt * rate * (d.maxSize - 1)) / (d.grow * 1.6));
 
+    // a weed in the plot crowds the plant: it slowly chokes it and stops it healing
+    const choked = !!this.cell.weed;
+    if (choked) this.hp -= dt * this.maxHp * WEED_CHOKE;
     if (wf === 0) {
       this.hp -= (dt * this.maxHp) / DRY_DEATH; // any plant lasts DRY_DEATH s from full HP once dry
       if (this.stage === 4) this.size = Math.max(1, this.size - dt * 0.01);
-    } else if (wf === 1 && this.mites < 1) this.hp = Math.min(this.maxHp, this.hp + dt * 0.7);
+    } else if (wf === 1 && this.mites < 1 && !choked) this.hp = Math.min(this.maxHp, this.hp + dt * 0.7);
 
     // Mites: multiply, chew, spread
     if (this.mites > 0) {

@@ -82,20 +82,23 @@ export const PLANTS = PLANT_DEFS;
 export const TOOLS = {
   hands: { name: 'Hands', icon: '✋', weight: 0, cost: 0, unlock: 1, desc: 'Pull weeds, carry, harvest. Weak punch.' },
   shovel: { name: 'Shovel', icon: '⛏️', weight: 1, cost: 10, unlock: 1, desc: 'Till plots, dig weeds, bonk pests and moles.' },
-  can: { name: 'Watering Can', icon: '🚿', weight: 1, cost: 12, unlock: 1, desc: 'Fill at the pond or a barrel. Hold to water.' },
+  can: { name: 'Watering Can', icon: '🚿', weight: 1, cost: 12, unlock: 1, desc: 'Refills itself at the pond and soaks up dew. Hold to water.' },
   steelshovel: { name: 'Steel Shovel', icon: '🗡️', weight: 1, base: 'shovel', cost: 45, unlock: 4, model: { sharp: true }, desc: 'A Shovel that hits 2× harder and swings faster.' },
-  goldcan: { name: 'Golden Can', icon: '🏆', weight: 1, base: 'can', cost: 50, unlock: 4, model: { gold: true }, desc: 'A Watering Can that holds double and pours faster.' },
+  goldcan: { name: 'Golden Can', icon: '🏆', weight: 1, base: 'can', cost: 50, unlock: 4, model: { gold: true }, cap: 2.5, desc: 'A Watering Can that holds 2.5× and pours faster.' },
   hose: { name: 'Garden Hose', icon: '🌊', weight: 2, cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
   soaphose: { name: 'Soap Hose', icon: '🧼', weight: 2, base: 'hose', cost: 160, unlock: 6, model: { soap: true }, desc: 'A Garden Hose whose spray also kills mites and burns slugs.' },
   swatter: { name: 'Fly Swatter', icon: '🏓', weight: 1, cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
   spray: { name: 'Soap Sprayer', icon: '🧴', weight: 1, cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
   slingshot: { name: 'Slingshot', icon: '🪃', weight: 1, cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
+  axe: { name: 'Axe', icon: '🪓', weight: 2, cost: 60, unlock: 3, weapon: true, desc: 'Fells a tree in one chop. Slow, but one-hits almost any pest.' },
   gun: { name: 'Spud Gun', icon: '🥔', weight: 2, cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
   mgun: { name: 'Seed Blaster', icon: '🔫', weight: 3, cost: 350, unlock: 6, weapon: true, desc: 'Hold to spray seeds. Overheats: fire in bursts.' },
   hotgun: { name: 'Hot Spud Gun', icon: '🔥', weight: 2, base: 'gun', cost: 150, unlock: 5, weapon: true, model: { hot: true }, desc: 'A Spud Gun with flaming spuds that hit harder and pierce.' },
 };
 export const toolBase = (key) => TOOLS[key]?.base ?? key;
-export const CAN_CAP = 3;
+// Watering can capacity in water units (a dew drop is DEW_WATER). A can's `cap` multiplies it.
+export const CAN_CAP = 4;
+export const DEW_WATER = 0.3;
 export const SPRAY_CAP = 25;
 
 // ───────────────────────── Bags (per player, worn) ─────────────────────────
@@ -124,6 +127,21 @@ export const PLACEABLES = {
   beehive: { name: 'Beehive', icon: '🐝', cost: 150, hp: 50, blocks: true, hit: [1.0, 0.85], radius: 7, unlock: 6, desc: 'Nearby plants +25% size and value.' },
   sellbox: { name: 'Sell Stand', icon: '🏷️', cost: 250, hp: 60, blocks: true, hit: [1.5, 1.1], unlock: 7, desc: 'Sell anything right in your garden.' },
 };
+
+// ───────────────────────── Trees ─────────────────────────
+// A few trees grow along the edges of the garden. One Axe chop fells a tree into WOOD_DROP pieces
+// of wood; the stump grows back into a tree TREES.regrow (min, max) days later (at dawn).
+export const TREES = { count: 12, hit: 0.5, regrow: [2, 4] };
+export const WOOD_DROP = 3;
+export const WOOD_SELL = 30;
+
+// ───────────────────────── Weeds ─────────────────────────
+// New weeds pick tilled plots WEED_PLOT_BIAS× as often as grass. A plot can't be planted with a weed
+// within WEED_NEAR of its center. A weed growing in a plant's plot chokes it: WEED_CHOKE of the
+// plant's max HP per second, and the plant can't heal while it's there.
+export const WEED_PLOT_BIAS = 4;
+export const WEED_NEAR = 1.9;
+export const WEED_CHOKE = 1 / 200;
 
 // ───────────────────────── Plant care (consumables) ─────────────────────────
 export const SUPPLIES = {
@@ -207,6 +225,7 @@ export function itemInfo(kind) {
   switch (k) {
     case 'weed': return { name: 'Weeds', icon: '🌿', sell: 1 };
     case 'junk': return { name: 'Old Junk', icon: '🥾', sell: 3 };
+    case 'wood': return { name: 'Wood', icon: '🪵', sell: WOOD_SELL };
     case 'dew': return { name: 'Dew Drop', icon: '💧' };
     case 'coin': return { name: 'Coins', icon: '🪙' };
     case 'seed': return { name: `${PLANTS[sub].name} Seeds`, icon: PLANTS[sub].icon, sub: PLANTS[sub].icon };
@@ -221,12 +240,13 @@ export function itemInfo(kind) {
 // sell back at half price.
 export const isSellable = (kind) => kind !== 'coin' && kind !== 'dew' && kind !== 'hands';
 // Garden goods: what the Quick Sell kiosk sells all at once.
-export const isLoot = (kind) => kind === 'weed' || kind === 'junk' || kind.startsWith('produce:');
+export const isLoot = (kind) => kind === 'weed' || kind === 'junk' || kind === 'wood' || kind.startsWith('produce:');
 export function sellEach(kind) {
   const [k, sub] = kind.split(':');
   switch (k) {
     case 'weed': return 1;
     case 'junk': return 3;
+    case 'wood': return WOOD_SELL;
     case 'seed': return Math.max(1, Math.floor(PLANTS[sub].cost / 2));
     case 'kit': return Math.max(1, Math.floor(PLACEABLES[sub].cost / 2));
     case 'tool': return Math.max(1, Math.floor(TOOLS[sub].cost / 2));

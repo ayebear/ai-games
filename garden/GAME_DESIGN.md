@@ -72,7 +72,14 @@ You start with **$0, bare hands, and an overgrown garden**:
 
 - **Weeds** (yellow dandelions) are everywhere. Hold Interact to pull one. Weeds sell for $1 at the Quick Sell kiosk, or
   can be fed to a Compost Bin later.
+- **Weeds keep creeping in**, and they love loose soil: a tilled plot is **4× as likely** to sprout
+  one as grass. You **can't plant** a plot with a weed in it or right at its edge (the target points
+  at the weed: pull it first). A weed growing in a plant's plot **chokes it**: the plant slowly loses
+  HP (its max HP over ~200 s), can't heal, and dries out faster.
 - **Old junk** (boots, cans) is lying around and sells for $3.
+- **Trees** stand along the east, west and south edges. An **Axe** fells one in a single chop into
+  **3 pieces of wood ($30 each** at Quick Sell). The stump grows back into a tree **2–4 days later**
+  at dawn.
 - A few **lost coins** sparkle in the grass.
 - **Dew drops** appear every morning, and the **pond never runs out**: press A at its edge (or at a
   Rain Barrel) to scoop dew until your bag is full. Hold the dew and press X at a plant (or the Heart
@@ -115,6 +122,8 @@ Each plant has three needs plus a health bar:
 | **No water** | under 10 %: stops growing, dies in 90 s from full HP | empty: loses 2 HP/s | 💧 crossed out, red, bobbing |
 | **Sunlight** | The sun (strongest at noon), Sun Lamps, Sun Jars | Growth speed. Sun-lovers (Sunflower) need much more of it. |
 | **Soil** | Tilled plots start as Dirt. Improve them with Soil Bags or compost | Dirt ×0.6 → Loam ×1.0 → Rich ×1.4 → Magic ×1.9 growth. Every harvest uses up one soil level. |
+
+**Health:** whenever a plant is hurt at all, a ❤️ ring (filled to its HP) shows on its badge above it.
 
 **Growth stages:** Seed → Sprout → Growing → Bud → **Bloom** (ready to harvest).
 A bloomed plant you keep caring for **keeps getting bigger** (size ×1.0 up to its max), and
@@ -190,7 +199,7 @@ better items.
 | West | 🌱 **Seeds** | Daisy, Strawberry, Carrot, Marigold, Sunflower, Tomato, Flytrap, Corn, Rose, Watermelon, Giant Pumpkin |
 | North-west | 🧰 **Garden Gear** | Shovel, Watering Can, Satchel, Backpack, Steel Shovel, Golden Can, Garden Hose, Soap Hose, Wheelbarrow |
 | North | 🧪 **Plant Care** | Soil Bag, Fertilizer, Sun Jar, Heart Mulch |
-| North-east | 🎯 **Pest Control** | Fly Swatter, Soap Sprayer, Slingshot, Spud Gun, Hot Spud Gun, Seed Blaster |
+| North-east | 🎯 **Pest Control** | Fly Swatter, Soap Sprayer, Slingshot, Axe, Spud Gun, Hot Spud Gun, Seed Blaster |
 | East | ⛲ **Gadgets** | Fence, Beer Trap, Rain Barrel, Compost Bin, Scarecrow, Sun Lamp, Sprinkler, Ladybug House, Bug Zapper, Beehive, Sell Stand |
 
 Each petal has a colored, petal-shaped patch on the floor and one **floating sign** with the shop's
@@ -271,19 +280,25 @@ Each gnome holds **one tool of each kind**. A better version works like its base
 stronger, and buying it trades in the base tool for half price (the new one takes its place in your
 bag). Dropped tools can be shared: picking up a tool you already have a version of swaps them.
 Tools live in your bag with everything else and **have weight**: hand tools weigh 1, the hoses and
-spud guns 2, the Seed Blaster 3.
+spud guns and the Axe 2, the Seed Blaster 3.
 
 **Garden Gear** shop (tools):
 
 | Tool | Day | Cost | Uses |
 |---|---|---|---|
 | ✋ Hands | — | free | Pull weeds, carry, harvest, weak punch |
-| Shovel | 1 | $10 | **Till** grass into plots · **dig out** weeds · **bonk** pests · the only tool that hits **moles underground** |
-| Watering Can | 1 | $12 | Fill at the pond or a Rain Barrel · hold to water · splash flies |
+| Shovel | 1 | $10 | **Till** grass into plots · **fill in** an empty plot (back to grass; its soil upgrades are lost) · **dig out** weeds · **bonk** pests · the only tool that hits **moles underground** |
+| Watering Can | 1 | $12 | Holds 4 water (a dew drop is 0.3) · hold to water · splash flies · **fills itself** (below) |
 | Steel Shovel | 4 | $45 | A Shovel that hits ×2 harder and swings faster |
-| Golden Can | 4 | $50 | A Watering Can that holds double and pours faster |
+| Golden Can | 4 | $50 | A Watering Can that holds 2.5× (10 water) and pours faster |
 | Garden Hose | 4 | $90 | Endless water from the spigot (tethered, limited reach) · **blasts pests back** · careful, it can **overwater** |
 | Soap Hose | 6 | $160 | A Garden Hose whose spray also kills mites and burns slugs |
+
+**The can fills itself.** Owning a can is enough, you don't need it in your hands: walking up to
+the pond or a Rain Barrel tops it up, dew in your bag pours into it, and dew drops on the ground get
+pulled in as you walk near. Each drop adds 0.3 even if that overflows the can, so the last drop can
+waste a little. A splash, a "+💧 can" text and the can meter in your panel show when it happens.
+Water in the can weighs nothing, so a can frees up bag space compared to carrying dew.
 
 **Pest Control** shop:
 
@@ -292,6 +307,7 @@ spud guns 2, the Seed Blaster 3.
 | Fly Swatter | 1 | $6 | One-hit flies and moths · scatters crows · knocks mites off plants |
 | Soap Sprayer | 2 | $25 | **Kills mites** · burns slugs · refills with water |
 | Slingshot | 3 | $30 | Quick pebble shots; great for flies and crows at range |
+| Axe | 3 | $60 | **Fells a tree** in one chop (3 wood) · a slow (1.1 s), huge melee hit (30 damage) that one-hits every pest on the ground except the Moon Stag · can't reach flying pests |
 | Spud Gun | 3 | $60 | Long-range potatoes: the **deer stopper** |
 | Hot Spud Gun | 5 | $150 | A Spud Gun with flaming spuds that hit harder and **pierce** |
 | Seed Blaster | 6 | $350 | Hold to spray seeds. **Overheats** after about 3 s, so fire in bursts. The heat meter is in your panel |
@@ -351,7 +367,7 @@ spud guns 2, the Seed Blaster 3.
 - **Heavy loads slow you down**, up to −30 % speed when the bag is full. That's the trade-off
   between one big haul to the counter and several quick trips.
 - **Selling:** at the 💰 Quick Sell kiosk (or a Sell Stand), A sells **all your garden goods at
-  once** (weeds $1, junk $3, produce for its size-based value, ×2 if it's the Hot Item). With no
+  once** (weeds $1, junk $3, wood $30, produce for its size-based value, ×2 if it's the Hot Item). With no
   garden goods, it sells the shop good in your hands (seeds, kits and supplies) back for **half
   price**. Tools and bags sell back at their own stall (X). **Dew doesn't sell** (the pond is endless).
 - Bags (Garden Gear shop, **per gnome**, worn, a bigger bag trades in the old one): pockets hold 8 ·

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, DEFS, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS, WEATHER, WEATHER_FADE } from './config.js';
+import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, DEFS, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS, WEATHER, WEATHER_FADE, WEED_PLOT_BIAS } from './config.js';
 import { G, newStats, activePlayers, attentionThings, rand, pick, clamp, dist2, lerp, wx } from './state.js';
 import { World, spawnPickup, removePickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
+import { plantTrees, regrowTrees } from './trees.js';
 import { Player } from './players.js';
 import { Director, flashAt } from './enemies.js';
 import { updateSky } from './scene.js';
@@ -41,6 +42,7 @@ export class Game {
     for (const p of G.pickups) removePickup(p);
     for (const p of G.placeables) sc.remove(p.model.group);
     for (const p of G.projectiles) sc.remove(p.mesh);
+    for (const t of G.trees) sc.remove(t.model.group);
     if (G.heart) sc.remove(G.heart.model.group);
     if (G.world) for (const c of G.world.cells) { if (c.plot) sc.remove(c.plot); if (c.weed) sc.remove(c.weed.mesh); }
     G.fx?.clear();
@@ -53,6 +55,7 @@ export class Game {
     G.weather = 'clear'; for (const k in G.wx) G.wx[k] = k === 'clear' ? 1 : 0; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
     G.jar.attackedAt = -99;
     G.director.reset();
+    G.trees = plantTrees();
     const w = G.world;
     // The old, overgrown garden
     for (const [i, j] of [[11, 18], [12, 18], [17, 18], [18, 18]]) { const c = w.cell(i, j); w.till(c, 1); w.addWeed(c); }
@@ -175,6 +178,7 @@ export class Game {
     G.plants = G.plants.filter((pl) => !pl.dead);
     G.heart.update(dt);
     for (const pl of G.placeables) if (!pl.dead) pl.update(dt);
+    for (const t of G.trees) t.update(dt);
     G.placeables = G.placeables.filter((pl) => !pl.dead);
     for (const e of G.enemies) if (!e.dead) e.update(dt);
     G.enemies = G.enemies.filter((e) => !e.dead);
@@ -187,11 +191,21 @@ export class Game {
     this.weedT -= dt;
     if (this.weedT <= 0) {
       this.weedT = Math.max(5, 14 - G.day * 0.4);
-      const c = G.world.randomCell((c) => (c.type === 'grass' || c.type === 'plot') && !c.weed && !c.placeable && Math.abs(c.x) < 25 && Math.abs(c.z) < 25 && Math.hypot(c.x, c.z) > 3.5);
+      const c = this.weedSpot((c) => (c.type === 'grass' || c.type === 'plot') && !c.weed && !c.placeable && Math.abs(c.x) < 25 && Math.abs(c.z) < 25 && Math.hypot(c.x, c.z) > 3.5);
       if (c) G.world.addWeed(c);
     }
 
     if (G.heart.hp <= 0 || G.heart.dead) this.gameOver();
+  }
+
+  // A random cell for a new weed, where tilled plots are WEED_PLOT_BIAS× as likely as grass: weeds
+  // love loose soil.
+  weedSpot(ok) {
+    for (let k = 0; k < 200; k++) {
+      const c = G.world.randomCell(ok, 1);
+      if (c && (c.type === 'plot' || Math.random() < 1 / WEED_PLOT_BIAS)) return c;
+    }
+    return G.world.randomCell(ok);
   }
 
   dusk() {
@@ -215,8 +229,9 @@ export class Game {
     G.weather = G.day < 3 ? 'clear' : pickWeather();
     G.hotItem = pick(Object.keys(PLANTS).filter((k) => PLANTS[k].unlock <= G.day));
     this.spawnDew();
+    regrowTrees();
     for (let k = 0; k < 3; k++) {
-      const c = G.world.randomCell((c) => c.type === 'grass' && !c.weed && !c.placeable && Math.abs(c.x) < 25 && Math.abs(c.z) < 25 && Math.hypot(c.x, c.z) > 3.5);
+      const c = this.weedSpot((c) => (c.type === 'grass' || c.type === 'plot') && !c.weed && !c.placeable && Math.abs(c.x) < 25 && Math.abs(c.z) < 25 && Math.hypot(c.x, c.z) > 3.5);
       if (c) G.world.addWeed(c);
     }
     if (Math.random() < 0.35) {

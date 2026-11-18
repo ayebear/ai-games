@@ -22,6 +22,7 @@ function builders() {
   for (const k of Object.keys(PLACEABLES)) b['kit:' + k] = () => makePlaceable(k).group;
   for (const k of Object.keys(SUPPLIES)) b[k] = () => makeItem(k);
   b.junk = () => makeItem('junk');
+  b.wood = () => makeItem('wood');
   // seed packets, for the inventory (seeds and produce share the plant's emoji)
   for (const k of Object.keys(PLANTS)) b['packet:' + k] = () => makeItem('seed:' + k);
   return b;

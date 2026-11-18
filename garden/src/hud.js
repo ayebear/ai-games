@@ -167,7 +167,7 @@ export class HUD {
     const g = glyphsFor(p.device);
     const tool = p.tool;
     let meter = '';
-    if (tool === 'can') meter = this.meter('💧', p.can / p.canCap, '#4fc3f7');
+    if (tool === 'can' || p.canT > 0) meter = this.meter('💧', p.can / p.canCap, '#4fc3f7');
     if (tool === 'spray') meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
     if (tool === 'mgun') meter = this.meter(p.overheat ? '🔥' : '🌡️', p.heat || 0, p.overheat ? '#ff5252' : '#ffb74d');
     const h = p.held;
@@ -241,7 +241,10 @@ export class HUD {
       else if (pl.mites >= 1) alert = '🐛';
       else if (pl.hp < pl.maxHp * 0.4) alert = '💔';
       const main = pl.bloomed ? ring(pl.def.icon, 1, '#ffd54f', 'ready') : ring(pl.def.icon, pl.growth, '#9ccc65');
-      setHTML(el, `<div class="mini">${main}${alert ? `<div class="alert"><span>${alert}</span></div>` : ''}${waterIcon(pl.waterState)}</div>`);
+      // health ring whenever the plant is hurt at all
+      const hp = pl.hp / pl.maxHp;
+      const hpRing = hp < 1 ? ring('❤️', hp, hp < 0.4 ? '#ff5252' : '#ef5350', 'hp') : '';
+      setHTML(el, `<div class="mini">${main}${alert ? `<div class="alert"><span>${alert}</span></div>` : ''}${hpRing}${waterIcon(pl.waterState)}</div>`);
       this.project(pl.pos, pl.topY + 0.5, el);
     }
     // water icon over the Heart Bloom when it's thirsty

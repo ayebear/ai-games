@@ -40,6 +40,7 @@ Press a button on each controller once after the page loads so the browser can s
 | `src/enemies.js` | Enemy AI and the wave Director |
 | `src/plants.js` | Plant growth model (water/sun/soil) and the Heart Bloom |
 | `src/placeables.js` | Garden gadgets (sprinkler, zapper, lamp, …) |
+| `src/trees.js` | Choppable edge trees: felling, wood drops, stumps regrowing |
 | `src/world.js` | Grid, plots, weeds, ground pickups |
 | `src/market.js` | The flower-shaped market: one petal per shop, a floating pad per item (buy with A, sell back with X), price tags, NEW badges, Quick Sell kiosk |
 | `src/icons.js` | Item icons rendered from the 3D models at startup (used on boards, cards and the HUD) |
