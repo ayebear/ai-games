@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Games</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>" />
+  <style>
+    :root {
+      --bg: #f6f4fb;
+      --card: #ffffff;
+      --text: #1d1b26;
+      --muted: #6b6878;
+      --border: #e4e1ee;
+      --accent: #7c5cff;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14131a;
+        --card: #1e1c27;
+        --text: #f1eff8;
+        --muted: #a29fb2;
+        --border: #2e2b3a;
+        --accent: #a892ff;
+        color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 48px 20px 64px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); margin: 0 0 32px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .card {
+      display: block;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      color: inherit;
+      text-decoration: none;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .card:hover, .card:focus-visible {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 10px 28px rgb(0 0 0 / .12);
+      outline: none;
+    }
+    .card img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: var(--border);
+    }
+    .body { padding: 14px 16px 16px; }
+    .body h2 { font-size: 1.15rem; margin: 0 0 4px; }
+    .body p { margin: 0 0 10px; color: var(--muted); font-size: .95rem; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span {
+      font-size: .78rem;
+      padding: 2px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    footer { margin-top: 40px; color: var(--muted); font-size: .9rem; }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Games</h1>
+    <p class="sub">Some vibe coded games. Plug in a few controllers and grab some friends.</p>
+
+    <div class="grid">
+      <a class="card" href="garden/dist/">
+        <img src="thumbs/garden.jpg" alt="Bloom &amp; Doom title screen" loading="lazy" />
+        <div class="body">
+          <h2>Bloom &amp; Doom</h2>
+          <p>Grow plants by day, defend the Heart Bloom by night, and try to survive 100 days.</p>
+          <div class="tags"><span>1–4 players</span><span>Co-op</span><span>3D</span></div>
+        </div>
+      </a>
+
+      <a class="card" href="water/dist/">
+        <img src="thumbs/water.jpg" alt="Four players on a raft racing down a sky river" loading="lazy" />
+        <div class="body">
+          <h2>Jet Raft</h2>
+          <p>Raft down curvy magical sky rivers, blasting water jets to steer and keep afloat.</p>
+          <div class="tags"><span>1–4 players</span><span>Co-op</span><span>3D</span></div>
+        </div>
+      </a>
+    </div>
+
+    <footer>Build each game with <code>npm run build</code> in its folder. Source on <a href="https://github.com/ayebear/ai-games">GitHub</a>.</footer>
+  </main>
+</body>
+</html>
