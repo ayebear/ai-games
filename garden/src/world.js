@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL, GRID, HALF, FOREST, POND, SOIL, HEART_R, MARKET, STALLS, SPIGOT } from './config.js';
 import { G, rand, clamp } from './state.js';
-import { makeWeed, makeItem, mat, BOX, P } from './models.js';
+import { makeWeed, makeItem, makePickupRing, mat, BOX, P } from './models.js';
 
 export class World {
   constructor(scene) {
@@ -13,11 +13,10 @@ export class World {
         let type = 'grass';
         if (i < FOREST || j < FOREST || i >= GRID - FOREST || j >= GRID - FOREST) type = 'forest';
         else if (j >= MARKET.j0 && j <= MARKET.j1) {
-          const k = MARKET.kiosk, pz = MARKET.plaza;
-          if (i >= k.i0 && i <= k.i1 && j >= k.j0 && j <= k.j1) type = 'solid'; // Trading Post kiosk
-          else if (i >= pz.i0 && i <= pz.i1 && j === pz.j) type = 'plaza'; // in front of the quick-sell counter
+          const k = MARKET.kiosk;
+          if (i >= k.i0 && i <= k.i1 && j >= k.j0 && j <= k.j1) type = 'solid'; // Quick Sell kiosk
           else type = 'market'; // walkable floor; no tilling, weeds or gadgets
-        } else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
+        } else if (i >= MARKET.plaza.i0 && i <= MARKET.plaza.i1 && j === MARKET.plaza.j) type = 'plaza'; // in front of the quick-sell counter else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
         else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'solid'; // heart bloom
         this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null });
       }
@@ -106,8 +105,11 @@ export function spawnPickup(kind, count, x, z, value = 0, pop = true) {
   const mesh = makeItem(kind);
   mesh.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   G.scene.add(mesh);
+  // tools bring their own glowing pad; everything else gets the shared pickup ring
+  const ring = kind.startsWith('tool:') ? null : makePickupRing(kind === 'coin' ? 0xffd54f : 0xffffff);
+  if (ring) G.scene.add(ring);
   const p = {
-    kind, count, value, mesh,
+    kind, count, value, mesh, ring,
     pos: new THREE.Vector3(x, pop ? 0.5 : 0, z),
     vel: pop ? new THREE.Vector3(rand(-2, 2), 5, rand(-2, 2)) : new THREE.Vector3(),
     t: Math.random() * 10, life: kind === 'coin' ? 90 : Infinity, dead: false, noPick: pop ? 0.35 : 0,
@@ -122,6 +124,7 @@ export function spawnPickup(kind, count, x, z, value = 0, pop = true) {
 export function removePickup(p) {
   p.dead = true;
   G.scene.remove(p.mesh);
+  if (p.ring) G.scene.remove(p.ring);
 }
 
 export function updatePickups(dt) {
@@ -145,10 +148,15 @@ export function updatePickups(dt) {
     }
     const bob = p.kind === 'dew' || p.kind === 'coin' ? Math.sin(p.t * 3) * 0.08 + 0.1 : 0;
     p.mesh.position.set(p.pos.x, p.pos.y + bob, p.pos.z);
+    if (p.ring) {
+      p.ring.position.set(p.pos.x, 0.05, p.pos.z);
+      p.ring.scale.setScalar(0.5 + Math.sin(p.t * 3) * 0.04);
+    }
     p.mesh.rotation.y += dt * (p.kind === 'coin' ? 3 : 0.8);
     if (p.kind === 'dew' && G.phase === 'day' && G.time > 75) {
       // dew evaporates after mid-day
       p.mesh.scale.multiplyScalar(1 - dt * 0.6);
+      if (p.ring) p.ring.material.opacity = 0.6 * p.mesh.scale.x;
       if (p.mesh.scale.x < 0.1) removePickup(p);
     }
     p.life -= dt;

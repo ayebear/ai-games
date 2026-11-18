@@ -190,7 +190,10 @@ export class Player {
 
     // A: context action (some are hold-to-complete)
     const c = (this.ctx = this.computeContext());
-    if (c && c.hold) {
+    if (c && c.off) {
+      this.holdT = 0; this.holdTarget = null;
+      if (inp.pressed.a) sfx('error');
+    } else if (c && c.hold) {
       if (inp.held.a) {
         if (this.holdTarget !== c.id) { this.holdTarget = c.id; this.holdT = 0; }
         this.holdT += dt;
@@ -278,16 +281,16 @@ export class Player {
       this.sellAct = G.market.sellOption(this, st);
       return { id: 'stall' + st.id, stall: st, at: st.pos, sq: true, label: `Buy ${st.item.name}`, run: () => G.market.buy(this, st) };
     }
-    // Quick sell: the Trading Post counter at the market's front, or a Sell Stand in the garden.
+    // Quick sell: the kiosk in the middle of the market, or a Sell Stand in the garden.
     const atCounter = Math.hypot(this.pos.x - COUNTER.x, this.pos.z - COUNTER.z) < 3 && this.dir.z < 0.3;
     const stand = !atCounter && G.placeables.find((p) => p.type === 'sellbox' && !p.dead && dist2(p.pos, this.front(1.0)) < 1.4);
     if (atCounter || stand) {
       if (carry && isSellable(carry.kind)) {
         const price = this.sellPrice();
         const where = stand ? stand.pos : { x: COUNTER.x, z: COUNTER.z - 1.2 };
-        return { id: 'sell', at: stand ? stand.pos : null, label: `Sell ${itemInfo(carry.kind).name} ×${carry.count} for $${price}`, run: () => this.sell(where) };
+        return { id: 'sell', at: stand ? stand.pos : null, label: `Sell ×${carry.count} +$${price}`, run: () => this.sell(where) };
       }
-      if (atCounter) return { id: 'counter', label: 'Quick sell: bring anything here', run: () => sfx('error') };
+      if (atCounter) return { id: 'counter', label: 'Nothing to sell', off: true };
     }
     const plant = this.plantInFront();
     if (carry) {
@@ -296,17 +299,17 @@ export class Player {
           if (tc && tc.type === 'plot' && !tc.plant) return { id: 'plant', at: tc, sq: true, label: `Plant ${PLANTS[sub].name}`, run: () => this.plantSeed(tc, sub) };
           break;
         case 'soil':
-          if (tc && tc.type === 'plot' && tc.soil < 3) return { id: 'soil', at: tc, sq: true, label: `Add soil (${SOIL[tc.soil].name} → ${SOIL[tc.soil + 1].name})`, run: () => this.addSoil(tc) };
+          if (tc && tc.type === 'plot' && tc.soil < 3) return { id: 'soil', at: tc, sq: true, label: `Add soil → ${SOIL[tc.soil + 1].name}`, run: () => this.addSoil(tc) };
           break;
         case 'fertilizer':
           if (plant && (plant.stage < 4 || plant.size < plant.def.maxSize)) return { id: 'fert', at: plant, label: `Fertilize ${plant.def.name}`, run: () => this.boost(plant, 0.25, 0.15) };
           break;
         case 'sunjar':
-          if (plant) return { id: 'jar', at: plant, label: `Pour sunshine on ${plant.def.name}`, run: () => this.boost(plant, 0.35, 0.25, true) };
+          if (plant) return { id: 'jar', at: plant, label: `Sun Jar on ${plant.def.name}`, run: () => this.boost(plant, 0.35, 0.25, true) };
           break;
         case 'dew':
           if (plant) return { id: 'dew', at: plant, label: `Water ${plant.def.name}`, run: () => this.dew(plant) };
-          if (this.heartNear()) return { id: 'dewh', label: 'Water the Heart Bloom', run: () => this.dew(G.heart) };
+          if (this.heartNear()) return { id: 'dewh', label: 'Water the Heart', run: () => this.dew(G.heart) };
           break;
         case 'weed': {
           const bin = G.placeables.find((p) => p.type === 'compost' && !p.dead && dist2(p.pos, this.pos) < 2.6);
@@ -323,12 +326,11 @@ export class Player {
     const pk = this.nearestPickup();
     if (pk && pk.kind.startsWith('tool:')) {
       const t = pk.kind.slice(5);
-      if (this.tools.includes(t)) return { id: 'owned', at: pk.pos, label: `You already have a ${TOOLS[t].name}`, run: () => sfx('error') };
+      if (this.tools.includes(t)) return { id: 'owned', at: pk.pos, label: 'Already have one', off: true };
       return { id: 'picktool', at: pk.pos, label: `Pick up ${TOOLS[t].name}`, run: () => this.pickUpTool(pk, t) };
     }
     if (pk && !this.canTake(pk.kind)) {
-      const why = this.carry && this.carry.kind !== pk.kind ? 'Hands full: drop (B) or sell first' : `Bag full (${this.load}/${this.capacity})`;
-      return { id: 'full', at: pk.pos, label: why, run: () => { sfx('error'); this.say('Bag full!', '#ffab91'); } };
+      return { id: 'full', at: pk.pos, label: this.fullWhy(pk.kind), off: true };
     }
     if (pk) {
       const inf = itemInfo(pk.kind);
@@ -338,11 +340,10 @@ export class Player {
       return { id: 'harvest', at: plant, label: `Harvest ${plant.def.name}`, run: () => this.harvest(plant) };
     }
     if (plant && plant.bloomed && carry) {
-      const why = carry.kind === 'produce:' + plant.type ? `Bag full (${this.load}/${this.capacity}): go sell!` : 'Hands full: drop (B) to harvest';
-      return { id: 'full', at: plant, label: why, run: () => sfx('error') };
+      return { id: 'full', at: plant, label: this.fullWhy('produce:' + plant.type), off: true };
     }
     const wc = tc && tc.weed ? tc : own && own.weed ? own : null;
-    if (wc && !this.canTake('weed') && !(tc && tc.plant && tc.plant.bloomed)) return { id: 'fullw', at: wc, sq: true, label: carry && carry.kind !== 'weed' ? 'Hands full: drop (B) to pull weeds' : `Bag full (${this.load}/${this.capacity})`, run: () => sfx('error') };
+    if (wc && !this.canTake('weed') && !(tc && tc.plant && tc.plant.bloomed)) return { id: 'fullw', at: wc, sq: true, label: this.fullWhy('weed'), off: true };
     if (wc && this.canTake('weed')) return { id: `weed${wc.i},${wc.j}`, at: wc, sq: true, label: 'Pull weed', hold: 0.5, run: () => this.pullWeed(wc) };
     if (!carry && tc && tc.placeable) {
       const pl = tc.placeable;
@@ -351,6 +352,9 @@ export class Player {
     if (carry && !this.ctx) return null;
     return null;
   }
+
+  // Why you can't take more of `kind`: holding something else, or the bag is full.
+  fullWhy(kind) { return this.carry && this.carry.kind !== kind ? 'Hands full' : 'Bag full'; }
 
   // ── Actions ──
   sellPrice() {
@@ -494,11 +498,13 @@ export class Player {
     // at a market stall X sells that item back instead of using your tool
     if (this.sellAct) {
       this.xLabel = this.sellAct.label;
+      this.xOff = false;
       if (pressed) this.sellAct.run();
       this.hose.visible = false;
       return;
     }
     this.xLabel = this.toolLabel(tc);
+    this.xOff = this.toolBlocked();
     switch (tool) {
       case 'hands':
         if (pressed && this.cool <= 0) {
@@ -528,7 +534,7 @@ export class Player {
           G.fx.burst({ x: this.pos.x, y: 0.5, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
           this.say('Filled!', '#81d4fa'); sfx('splash');
         } else if (held && !this.nearWater()) {
-          if (this.can <= 0) { if (pressed) { this.say('Can is empty!', '#ffab91'); sfx('error'); } break; }
+          if (this.can <= 0) { if (pressed) sfx('error'); break; }
           this.pouring = true;
           const rate = (G.upgrades.has('bigcan') ? 1.0 : 0.6) * dt;
           const amt = Math.min(this.can, rate);
@@ -557,7 +563,7 @@ export class Player {
           this.spray = SPRAY_CAP;
           this.say('Soap refilled!', '#f8bbd0'); sfx('splash');
         } else if (held && this.cool <= 0) {
-          if (this.spray <= 0) { if (pressed) { this.say('Sprayer empty!', '#ffab91'); sfx('error'); } break; }
+          if (this.spray <= 0) { if (pressed) sfx('error'); break; }
           this.cool = 0.14; this.spray--;
           const tp = this.toolPos();
           for (let i = 0; i < 4; i++) G.fx.stream(tp, new THREE.Vector3(this.dir.x, 0, this.dir.z), i % 2 ? 0xf8bbd0 : 0xffffff, { speed: 8, spread: 0.25, life: 0.35, size: 0.09 });
@@ -589,7 +595,7 @@ export class Player {
         this.hose.visible = true;
         if (held) {
           const dS = Math.hypot(this.pos.x - SPIGOT.x, this.pos.z - SPIGOT.z);
-          if (dS > HOSE_LEN) { this.say("Hose won't reach!", '#ffab91'); break; }
+          if (dS > HOSE_LEN) { if (pressed) sfx('error'); break; }
           this.streaming = true;
           const tp = this.toolPos();
           for (let i = 0; i < 3; i++) G.fx.stream(tp, new THREE.Vector3(this.dir.x, 0.15, this.dir.z), 0x4fc3f7, { speed: 12, spread: 0.1, life: 0.45 });
@@ -615,16 +621,28 @@ export class Player {
     switch (this.tool) {
       case 'hands': return 'Punch';
       case 'shovel': return tc && tc.weed ? 'Dig weed' : tc && tc.type === 'grass' && !tc.placeable && Math.hypot(tc.x, tc.z) > 3.5 ? 'Till plot' : 'Bonk';
-      case 'can': return this.nearWater() ? 'Fill can' : this.can > 0 ? 'Hold: water' : 'Empty!';
+      case 'can': return this.nearWater() ? 'Fill can' : this.can > 0 ? 'Hold: water' : 'Can empty';
       case 'swatter': return 'Swat';
-      case 'spray': return this.nearWater() ? 'Refill soap' : this.spray > 0 ? 'Hold: spray' : 'Empty!';
+      case 'spray': return this.nearWater() ? 'Refill soap' : this.spray > 0 ? 'Hold: spray' : 'Sprayer empty';
       case 'slingshot': return 'Fling pebble';
       case 'gun': return 'Fire spud';
-      case 'mgun': return this.overheat ? 'Cooling down…' : 'Hold: fire';
-      case 'hose': return Math.hypot(this.pos.x - SPIGOT.x, this.pos.z - SPIGOT.z) > HOSE_LEN ? 'Too far from spigot' : 'Hold: hose';
+      case 'mgun': return this.overheat ? 'Overheated' : 'Hold: fire';
+      case 'hose': return this.hoseTooFar() ? 'Hose too short' : 'Hold: hose';
     }
     return '';
   }
+
+  // X does nothing right now (shown greyed out).
+  toolBlocked() {
+    switch (this.tool) {
+      case 'can': return !this.nearWater() && this.can <= 0;
+      case 'spray': return !this.nearWater() && this.spray <= 0;
+      case 'mgun': return !!this.overheat;
+      case 'hose': return this.hoseTooFar();
+    }
+    return false;
+  }
+  hoseTooFar() { return Math.hypot(this.pos.x - SPIGOT.x, this.pos.z - SPIGOT.z) > HOSE_LEN; }
 
   shoot(kind = 'gun') {
     const hot = G.upgrades.has('potato');

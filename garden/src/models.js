@@ -1,5 +1,6 @@
 // Procedural low-poly models built from cached primitive geometries & materials.
 import * as THREE from 'three';
+import { PLANTS } from './config.js';
 
 const mats = new Map();
 export function mat(color, opts = {}) {
@@ -91,47 +92,85 @@ export function makeGnome(color) {
   return { group: g, legL, legR, armL, armR, tool, lantern, flame, hat, carry, ring };
 }
 
-export function makeTool(id) {
+// Tools are built along +y (handle at the bottom). opts: { gold, sharp, hot, reel } for upgrade
+// and icon variants.
+export function makeTool(id, opts = {}) {
   const g = new THREE.Group();
+  const steel = mat(METAL, { metalness: 0.55, roughness: 0.35 });
   switch (id) {
-    case 'shovel':
-      P(g, CYL(6), mat(WOOD), [0, 0.25, 0], [0.035, 0.9, 0.035]);
-      P(g, BOX(), mat(METAL, { metalness: 0.5, roughness: 0.4 }), [0, 0.82, 0], [0.24, 0.3, 0.04]);
-      P(g, BOX(), mat(WOOD), [0, -0.2, 0], [0.18, 0.04, 0.04]);
+    case 'shovel': {
+      P(g, CYL(6), mat(WOOD), [0, 0.3, 0], [0.035, 0.95, 0.035]);
+      P(g, TORUS(), mat(WOOD), [0, -0.24, 0], [0.09, 0.07, 0.09]); // D-grip
+      const blade = opts.sharp ? mat(0xe3f2fd, { metalness: 0.8, roughness: 0.15, emissive: 0x4fc3f7, emissiveIntensity: 0.35 }) : steel;
+      P(g, CYL(6), steel, [0, 0.8, 0], [0.05, 0.1, 0.05]);
+      P(g, BOX(), blade, [0, 0.95, 0], [0.3, 0.26, 0.035]);
+      P(g, CONE(4), blade, [0, 1.13, 0], [0.21, 0.14, 0.025], [0, Math.PI / 4, 0]);
       break;
-    case 'can':
-      P(g, CYL(10), mat(0x3a9a5a), [0, 0.15, 0.05], [0.17, 0.3, 0.17]);
-      P(g, CYL(6), mat(0x3a9a5a), [0, 0.25, 0.25], [0.03, 0.35, 0.03], [0.9, 0, 0]);
-      P(g, CONE(8), mat(0x3a9a5a), [0, 0.38, 0.4], [0.06, 0.08, 0.06], [0.9, 0, 0]);
+    }
+    case 'can': {
+      const c = opts.gold ? mat(0xffc107, { metalness: 0.75, roughness: 0.25 }) : mat(0x3a9a5a);
+      P(g, CYL(12), c, [0, 0.16, 0], [0.18, 0.32, 0.18]);
+      P(g, TORUS(), c, [0, 0.36, -0.04], [0.13, 0.13, 0.13], [0, Math.PI / 2, 0]); // top handle
+      P(g, CYL(6), c, [0, 0.25, 0.27], [0.035, 0.4, 0.035], [0.95, 0, 0]);
+      P(g, CYL(8, 1), c, [0, 0.39, 0.44], [0.08, 0.06, 0.08], [0.95, 0, 0]); // rose
       break;
+    }
     case 'swatter':
-      P(g, CYL(6), mat(0xeeeeee), [0, 0.3, 0], [0.025, 0.6, 0.025]);
-      P(g, BOX(), mat(0xe53935), [0, 0.75, 0], [0.32, 0.36, 0.025]);
+      P(g, CYL(6), mat(0xeeeeee), [0, 0.3, 0], [0.025, 0.65, 0.025]);
+      P(g, BOX(), mat(0xe53935), [0, 0.78, 0], [0.36, 0.36, 0.025]);
+      for (const k of [-1, 0, 1]) {
+        P(g, BOX(), mat(0x9a1a1a), [k * 0.09, 0.78, 0.014], [0.025, 0.36, 0.01]);
+        P(g, BOX(), mat(0x9a1a1a), [0, 0.78 + k * 0.09, 0.014], [0.36, 0.025, 0.01]);
+      }
       break;
     case 'spray':
-      P(g, CYL(10), mat(0xbfe6ff, { transparent: true, opacity: 0.85 }), [0, 0.15, 0], [0.09, 0.3, 0.09]);
-      P(g, BOX(), mat(0xff7eb6), [0, 0.36, 0.04], [0.1, 0.12, 0.18]);
+      P(g, CYL(12), mat(0xbfe6ff, { transparent: true, opacity: 0.85 }), [0, 0.16, 0], [0.11, 0.32, 0.11]);
+      P(g, CYL(12), mat(0xf48fb1), [0, 0.12, 0], [0.1, 0.2, 0.1]); // soap inside
+      P(g, CYL(8), mat(0xffffff), [0, 0.35, 0], [0.05, 0.08, 0.05]);
+      P(g, BOX(), mat(0xff7eb6), [0, 0.43, 0.04], [0.1, 0.12, 0.22]);
+      P(g, CYL(6), mat(0x37474f), [0, 0.45, 0.17], [0.025, 0.08, 0.025], [Math.PI / 2, 0, 0]);
+      P(g, BOX(), mat(0xff7eb6), [0, 0.33, 0.1], [0.04, 0.12, 0.03], [0.3, 0, 0]); // trigger
       break;
     case 'slingshot':
-      P(g, CYL(6), mat(WOOD), [0, 0.15, 0], [0.035, 0.35, 0.035]);
-      P(g, CYL(6), mat(WOOD), [-0.08, 0.42, 0], [0.03, 0.25, 0.03], [0, 0, 0.45]);
-      P(g, CYL(6), mat(WOOD), [0.08, 0.42, 0], [0.03, 0.25, 0.03], [0, 0, -0.45]);
-      P(g, BOX(), mat(0xc62828), [0, 0.52, -0.03], [0.3, 0.025, 0.025]);
+      P(g, CYL(6), mat(WOOD), [0, 0.15, 0], [0.04, 0.35, 0.04]);
+      P(g, CYL(6), mat(WOOD), [-0.09, 0.42, 0], [0.035, 0.28, 0.035], [0, 0, 0.5]);
+      P(g, CYL(6), mat(WOOD), [0.09, 0.42, 0], [0.035, 0.28, 0.035], [0, 0, -0.5]);
+      P(g, CYL(4), mat(0x37474f), [-0.09, 0.53, -0.1], [0.012, 0.24, 0.012], [Math.PI / 2 - 0.5, 0, 0.5]);
+      P(g, CYL(4), mat(0x37474f), [0.09, 0.53, -0.1], [0.012, 0.24, 0.012], [Math.PI / 2 - 0.5, 0, -0.5]);
+      P(g, BOX(), mat(0x795548), [0, 0.52, -0.2], [0.1, 0.05, 0.05]); // pouch
       break;
-    case 'mgun':
-      P(g, BOX(), mat(0x37474f, { metalness: 0.6, roughness: 0.4 }), [0, 0.1, 0], [0.16, 0.45, 0.18]);
-      P(g, CYL(8), mat(0x263238, { metalness: 0.7, roughness: 0.3 }), [0, 0.6, 0], [0.05, 0.75, 0.05]);
-      P(g, CYL(8), mat(0x546e7a), [0, 0.55, 0], [0.08, 0.12, 0.08]);
-      P(g, CYL(12), mat(0xffb300, { metalness: 0.5, roughness: 0.4 }), [0, 0.1, -0.16], [0.14, 0.08, 0.14], [Math.PI / 2, 0, 0]);
+    case 'gun': {
+      // PVC spud cannon: fat chamber, thin barrel, a potato poking out
+      const pvc = mat(0xeceff1, { roughness: 0.5 });
+      P(g, CYL(10), pvc, [0, 0.05, 0], [0.13, 0.4, 0.13]);
+      P(g, CYL(10, 0.55), pvc, [0, 0.3, 0], [0.13, 0.1, 0.13]);
+      P(g, CYL(10), pvc, [0, 0.72, 0], [0.075, 0.75, 0.075]);
+      P(g, CYL(10), mat(0x90a4ae), [0, 1.08, 0], [0.09, 0.05, 0.09]);
+      P(g, BOX(), mat(0xff7043), [0.13, 0.05, 0], [0.06, 0.12, 0.06]); // igniter
+      P(g, SPH(8, 6), opts.hot ? glow(0xff7043, 1.2) : mat(0xc49a5a), [0, 1.13, 0], [0.07, 0.06, 0.07]);
       break;
-    case 'gun':
-      P(g, CYL(10), mat(0x6b7d3a), [0, 0.45, 0], [0.08, 0.9, 0.08]);
-      P(g, CYL(10), mat(0x4a5a2a), [0, 0.0, 0], [0.13, 0.35, 0.13]);
-      P(g, SPH(8, 6), mat(0xc49a5a), [0, 0.92, 0], [0.07, 0.05, 0.07]);
+    }
+    case 'mgun': {
+      const body = mat(0x37474f, { metalness: 0.5, roughness: 0.4 });
+      P(g, BOX(), body, [0, 0.15, 0], [0.16, 0.5, 0.2]);
+      P(g, CYL(8), mat(0x263238, { metalness: 0.7, roughness: 0.3 }), [0, 0.65, 0], [0.05, 0.6, 0.05]);
+      P(g, CYL(8), mat(0xff9800), [0, 0.95, 0], [0.07, 0.05, 0.07]);
+      P(g, CYL(14), mat(0xffb300, { metalness: 0.4, roughness: 0.4 }), [0, 0.22, -0.17], [0.17, 0.1, 0.17], [Math.PI / 2, 0, 0]); // seed drum
+      P(g, BOX(), body, [0, -0.08, 0.12], [0.08, 0.1, 0.18], [0.5, 0, 0]); // grip
       break;
+    }
     case 'hose':
-      P(g, CYL(8), mat(0xffc107), [0, 0.2, 0], [0.05, 0.4, 0.05]);
-      P(g, CYL(8, 0.6), mat(0x2e7d32), [0, -0.05, 0], [0.07, 0.2, 0.07]);
+      if (opts.reel) {
+        // icon: a reel of green hose with a yellow nozzle
+        for (let i = 0; i < 3; i++) P(g, TORUS(), mat(i % 2 ? 0x388e3c : 0x43a047), [0, 0.35, -0.06 + i * 0.06], [0.3 - i * 0.02, 0.3 - i * 0.02, 0.35]);
+        P(g, CYL(10), mat(0xd84315), [0, 0.35, 0], [0.1, 0.24, 0.1], [Math.PI / 2, 0, 0]);
+        P(g, CYL(8), mat(0xffc107), [0.3, 0.1, 0.1], [0.05, 0.25, 0.05], [0, 0, -0.6]);
+        P(g, BOX(), mat(0xffc107), [0.22, 0.0, 0.1], [0.06, 0.14, 0.06]);
+      } else {
+        P(g, CYL(8), mat(0xffc107), [0, 0.22, 0], [0.055, 0.4, 0.055]);
+        P(g, BOX(), mat(0xffc107), [0, 0.02, 0.06], [0.06, 0.16, 0.06], [0.4, 0, 0]);
+        P(g, CYL(8, 0.6), mat(0x2e7d32), [0, -0.1, 0], [0.07, 0.24, 0.07]);
+      }
       break;
   }
   return g;
@@ -514,8 +553,10 @@ export function makePlaceable(type) {
       break;
     }
     case 'beertrap':
-      P(g, CYL(12), mat(0xc0703a), [0, 0.07, 0], [0.38, 0.14, 0.38]);
-      P(g, DISC(16), mat(0xffb300, { roughness: 0.2, emissive: 0x442200 }), [0, 0.15, 0], 0.32, [-Math.PI / 2, 0, 0], false);
+      // a shallow dish of beer with a foamy head, sunk into the ground
+      P(g, CYL(14), mat(0x8d6e63), [0, 0.08, 0], [0.45, 0.16, 0.45]);
+      P(g, DISC(16), mat(0xffb300, { roughness: 0.15, emissive: 0x553300 }), [0, 0.17, 0], 0.38, [-Math.PI / 2, 0, 0], false);
+      for (let i = 0; i < 6; i++) P(g, SPH(6, 4), mat(0xfff8e1), [Math.cos(i * 1.05) * 0.24, 0.18, Math.sin(i * 1.05) * 0.24], [0.1, 0.05, 0.1]);
       break;
     case 'barrel':
       P(g, CYL(12), mat(0x8a5a2c), [0, 0.55, 0], [0.55, 1.1, 0.55]);
@@ -524,9 +565,13 @@ export function makePlaceable(type) {
       P(g, DISC(16), mat(0x4fc3f7, { roughness: 0.1 }), [0, 1.08, 0], 0.5, [-Math.PI / 2, 0, 0], false);
       break;
     case 'compost':
-      P(g, BOX(), mat(0x2e7d32), [0, 0.5, 0], [1.2, 1.0, 1.2]);
-      P(g, BOX(), mat(0x1b5e20), [0, 1.05, 0], [1.3, 0.1, 1.3]);
-      P(g, BOX(), mat(0xffffff), [0, 0.6, 0.61], [0.4, 0.4, 0.02]);
+      // open slatted wooden bin heaped with green scraps
+      for (const [x, z, r] of [[0, 0.55, 0], [0, -0.55, 0], [0.55, 0, 1], [-0.55, 0, 1]]) {
+        for (let k = 0; k < 3; k++) P(g, BOX(), mat(k % 2 ? 0x8d6e4b : 0xa1784f), [x, 0.2 + k * 0.3, z], [1.15, 0.22, 0.08], [0, r * Math.PI / 2, 0]);
+      }
+      for (const [x, z] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) P(g, BOX(), mat(0x5d4037), [x, 0.5, z], [0.12, 1.0, 0.12]);
+      P(g, HEMI(), mat(0x5d4037), [0, 0.6, 0], [0.5, 0.35, 0.5]);
+      for (let i = 0; i < 5; i++) P(g, ICO(0), mat(i % 2 ? 0x7cb342 : 0x9ccc65, { flat: true }), [Math.cos(i * 1.3) * 0.25, 0.8, Math.sin(i * 1.3) * 0.25], 0.13);
       break;
     case 'zapper':
       P(g, CYL(8), mat(0x37474f), [0, 0.1, 0], [0.3, 0.2, 0.3]);
@@ -552,6 +597,46 @@ export function makePlaceable(type) {
 }
 
 // ───────────────────────── Items ─────────────────────────
+// Emoji painted onto a canvas texture (seed packet pictures, upgrade emblems).
+const emojiTexCache = new Map();
+export function emojiTex(icon, bg = null) {
+  const key = icon + '|' + bg;
+  if (emojiTexCache.has(key)) return emojiTexCache.get(key);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const x = cv.getContext('2d');
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 128, 128); }
+  x.font = '92px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(icon, 64, 72);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  emojiTexCache.set(key, t);
+  return t;
+}
+
+export function makeWheelbarrow() {
+  const g = new THREE.Group();
+  const red = mat(0xd84336);
+  P(g, BOX(), red, [0, 0.45, 0], [0.6, 0.12, 0.8]);
+  P(g, BOX(), red, [0, 0.58, 0.38], [0.6, 0.3, 0.06], [0.35, 0, 0]);
+  P(g, BOX(), red, [0, 0.58, -0.38], [0.6, 0.3, 0.06], [-0.35, 0, 0]);
+  for (const s of [-1, 1]) P(g, BOX(), red, [s * 0.32, 0.58, 0], [0.06, 0.3, 0.8], [0, 0, -s * 0.35]);
+  P(g, CYL(14), mat(0x333333), [0, 0.2, 0.62], [0.2, 0.1, 0.2], [0, 0, Math.PI / 2]);
+  for (const s of [-1, 1]) {
+    P(g, CYL(6), mat(WOOD), [s * 0.22, 0.42, -0.25], [0.035, 1.2, 0.035], [Math.PI / 2 - 0.25, 0, 0]);
+    P(g, CYL(6), mat(0x5d4037), [s * 0.22, 0.2, -0.3], [0.03, 0.4, 0.03]);
+  }
+  return g;
+}
+
+// A soft ring under everything you can pick up. Same marker everywhere = "this is interactable".
+export function makePickupRing(color = 0xffffff) {
+  const m = new THREE.Mesh(RING(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  return m;
+}
+
 export function makeItem(kind) {
   const g = new THREE.Group();
   const [k, sub] = kind.split(':');
@@ -566,24 +651,40 @@ export function makeItem(kind) {
   }
   switch (k) {
     case 'weed':
-      for (let i = 0; i < 3; i++) P(g, CONE(5), mat(0x6b8e23), [Math.cos(i * 2.1) * 0.08, 0.18, Math.sin(i * 2.1) * 0.08], [0.06, 0.38, 0.06], [Math.cos(i * 2.1) * 0.3, 0, Math.sin(i * 2.1) * 0.3]);
+      for (let i = 0; i < 4; i++) P(g, CONE(4), mat(0x7a9a1f, { flat: true }), [Math.cos(i * 1.6) * 0.08, 0.16, Math.sin(i * 1.6) * 0.08], [0.07, 0.34, 0.07], [Math.cos(i * 1.6) * 0.4, 0, Math.sin(i * 1.6) * 0.4]);
+      P(g, ICO(0), mat(0xffeb3b, { flat: true }), [0, 0.32, 0], 0.08);
       P(g, SPH(6, 4), mat(0x6d4c2f), [0, 0.03, 0], [0.12, 0.06, 0.12]);
       break;
-    case 'junk':
-      P(g, BOX(), mat(0x6d4c41), [0, 0.15, 0], [0.18, 0.3, 0.2]);
-      P(g, BOX(), mat(0x6d4c41), [0, 0.06, 0.12], [0.18, 0.12, 0.3]);
-      P(g, BOX(), mat(0x3e2723), [0, 0.01, 0.05], [0.2, 0.03, 0.46]);
+    case 'junk': {
+      // an old boot with a hole in the toe
+      const leather = mat(0x6d4c41);
+      P(g, BOX(), leather, [0, 0.2, -0.06], [0.2, 0.36, 0.18]);
+      P(g, SPH(10, 8), leather, [0, 0.09, 0.12], [0.11, 0.09, 0.2]);
+      P(g, BOX(), mat(0x3e2723), [0, 0.015, 0.04], [0.22, 0.03, 0.46]);
+      P(g, CYL(10), mat(0x3e2723), [0, 0.38, -0.06], [0.11, 0.03, 0.1]);
+      P(g, SPH(6, 4), mat(0xf6c9a4), [0.03, 0.14, 0.3], 0.035);
       break;
-    case 'dew':
-      P(g, SPH(12, 10), mat(0x7fdcff, { transparent: true, opacity: 0.75, roughness: 0.05, emissive: 0x1a6a8a, emissiveIntensity: 0.6 }), [0, 0.2, 0], [0.17, 0.2, 0.17]);
+    }
+    case 'dew': {
+      const water = mat(0x7fdcff, { transparent: true, opacity: 0.8, roughness: 0.05, emissive: 0x1a6a8a, emissiveIntensity: 0.7 });
+      P(g, SPH(14, 10), water, [0, 0.2, 0], 0.17);
+      P(g, CONE(14), water, [0, 0.42, 0], [0.12, 0.2, 0.12]);
+      P(g, SPH(6, 4), mat(0xffffff, { emissive: 0xffffff }), [0.06, 0.26, 0.12], 0.035, [0, 0, 0], false);
       break;
+    }
     case 'coin':
-      P(g, CYL(14), mat(0xffd54f, { metalness: 0.8, roughness: 0.25, emissive: 0x553300 }), [0, 0.22, 0], [0.18, 0.05, 0.18], [Math.PI / 2, 0, 0]);
+      P(g, CYL(16), mat(0xffd54f, { metalness: 0.8, roughness: 0.25, emissive: 0x996600, emissiveIntensity: 0.6 }), [0, 0.3, 0], [0.24, 0.06, 0.24], [Math.PI / 2, 0, 0]);
+      P(g, BOX(), mat(0xffa000, { metalness: 0.8, roughness: 0.3 }), [0, 0.3, 0.04], [0.06, 0.2, 0.02]);
       break;
-    case 'seed':
-      P(g, BOX(), mat(PLANT_COLORS[sub] ?? 0xffffff), [0, 0.22, 0], [0.3, 0.4, 0.05]);
-      P(g, BOX(), mat(0xfafafa), [0, 0.2, 0.03], [0.22, 0.18, 0.01]);
+    case 'seed': {
+      // a seed packet: plant-colored paper with a picture of the plant on the front
+      P(g, BOX(), mat(PLANT_COLORS[sub] ?? 0xffffff), [0, 0.24, 0], [0.34, 0.46, 0.05]);
+      P(g, BOX(), mat(0xfafafa), [0, 0.46, 0], [0.34, 0.04, 0.055]);
+      const pic = new THREE.MeshBasicMaterial({ map: emojiTex(PLANTS[sub]?.icon ?? '🌱', '#fffdf5'), toneMapped: false });
+      P(g, PLANE(), pic, [0, 0.22, 0.027], [0.27, 0.27, 1], [0, 0, 0], false);
+      P(g, PLANE(), pic, [0, 0.22, -0.027], [0.27, 0.27, 1], [0, Math.PI, 0], false);
       break;
+    }
     case 'produce': {
       const c = PLANT_COLORS[sub];
       if (sub === 'sunflower') {
@@ -616,36 +717,52 @@ export function makeItem(kind) {
       break;
     }
     case 'soil':
-      P(g, BOX(), mat(0x8d6e63), [0, 0.22, 0], [0.4, 0.44, 0.25]);
-      P(g, BOX(), mat(0x3e2723), [0, 0.22, 0.13], [0.3, 0.2, 0.01]);
+      // a burlap sack, open at the top, full of dark soil
+      P(g, SPH(12, 8), mat(0xc8a26a), [0, 0.22, 0], [0.24, 0.26, 0.2]);
+      P(g, CYL(12), mat(0xc8a26a), [0, 0.42, 0], [0.18, 0.1, 0.15]);
+      P(g, HEMI(), mat(0x3e2723), [0, 0.46, 0], [0.16, 0.08, 0.13]);
+      P(g, BOX(), mat(0x6d4c2f), [0, 0.22, 0.2], [0.18, 0.12, 0.01]);
       break;
     case 'fertilizer':
-      P(g, CYL(10), mat(0x26a69a), [0, 0.18, 0], [0.12, 0.36, 0.12]);
-      P(g, CYL(8), mat(0xffffff), [0, 0.4, 0], [0.06, 0.08, 0.06]);
+      // a jug of green plant food with a leaf label
+      P(g, CYL(12), mat(0xffffff), [0, 0.2, 0], [0.15, 0.4, 0.15]);
+      P(g, CYL(12), mat(0x43a047), [0, 0.2, 0], [0.155, 0.16, 0.155]);
+      P(g, CYL(8), mat(0x2e7d32), [0, 0.44, 0], [0.07, 0.08, 0.07]);
+      P(g, SPH(8, 6), mat(0xaed581), [0, 0.2, 0.15], [0.07, 0.04, 0.02], [0, 0, 0.6]);
       break;
     case 'sunjar':
-      P(g, CYL(12), mat(0xe0f7fa, { transparent: true, opacity: 0.4, roughness: 0.05 }), [0, 0.2, 0], [0.15, 0.36, 0.15]);
-      P(g, SPH(10, 8), glow(0xffd54f, 3), [0, 0.2, 0], 0.1, [0, 0, 0], false);
-      P(g, CYL(12), mat(0x8d6e63), [0, 0.4, 0], [0.13, 0.05, 0.13]);
+      P(g, CYL(12), mat(0xe0f7fa, { transparent: true, opacity: 0.4, roughness: 0.05 }), [0, 0.2, 0], [0.16, 0.38, 0.16]);
+      P(g, SPH(10, 8), glow(0xffd54f, 3), [0, 0.2, 0], 0.12, [0, 0, 0], false);
+      P(g, CYL(12), mat(0x8d6e63), [0, 0.41, 0], [0.14, 0.05, 0.14]);
       break;
-    case 'kit':
-      P(g, BOX(), mat(0xc8a06a), [0, 0.22, 0], [0.45, 0.42, 0.45]);
-      P(g, BOX(), mat(0x8d6e4b), [0, 0.22, 0], [0.47, 0.08, 0.47]);
-      P(g, BOX(), mat(0x8d6e4b), [0, 0.22, 0], [0.08, 0.44, 0.47]);
+    case 'kit': {
+      // a gadget kit is a mini version of the gadget itself on a little pallet, so you can tell them apart
+      P(g, BOX(), mat(0xc8a06a), [0, 0.04, 0], [0.55, 0.08, 0.55]);
+      const m = makePlaceable(sub).group;
+      m.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(m);
+      const sz = box.getSize(new THREE.Vector3());
+      const sc = 0.5 / Math.max(sz.x, sz.y * 0.8, sz.z, 0.01);
+      m.scale.setScalar(sc);
+      m.position.y = 0.08 - box.min.y * sc;
+      g.add(m);
       break;
+    }
   }
   return g;
 }
 
 // ───────────────────────── Environment bits ─────────────────────────
+// Weeds are dandelions: broad, dark jagged leaves with a bright yellow puff on a tall stem, so they
+// read as "pull me" against the short, ground-colored grass.
 export function makeWeed() {
   const g = new THREE.Group();
-  const n = 4 + Math.floor(Math.random() * 3);
+  const n = 5 + Math.floor(Math.random() * 2);
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + Math.random();
-    P(g, CONE(4), mat(i % 2 ? 0x9bbf2a : 0x6f9a1f, { flat: true }), [Math.cos(a) * 0.16, 0.3, Math.sin(a) * 0.16], [0.11, 0.65 + Math.random() * 0.25, 0.11], [Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5]);
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
+    P(g, CONE(3), mat(i % 2 ? 0x8a9a1a : 0x6b7f12, { flat: true }), [Math.cos(a) * 0.2, 0.22, Math.sin(a) * 0.2], [0.14, 0.5 + Math.random() * 0.2, 0.06], [Math.cos(a) * 0.9, -a, Math.sin(a) * 0.9]);
   }
-  P(g, CYL(5), mat(0x7a9a2a), [0.05, 0.4, 0], [0.025, 0.8, 0.025]);
-  P(g, ICO(0), mat(Math.random() < 0.7 ? 0xffeb3b : 0xffffff, { flat: true }), [0.05, 0.82, 0], 0.13);
+  P(g, CYL(5), mat(0x7a9a2a), [0.04, 0.45, 0], [0.03, 0.9, 0.03]);
+  P(g, ICO(1), mat(Math.random() < 0.75 ? 0xffd600 : 0xf5f5f5, { flat: true, emissive: 0x332a00 }), [0.04, 0.92, 0], 0.15);
   return g;
 }

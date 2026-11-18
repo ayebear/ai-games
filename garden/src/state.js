@@ -13,6 +13,7 @@ export const G = {
   hotItem: 'daisy',
   money: 0,
   upgrades: new Set(),
+  seen: new Set(), // market items a gnome has browsed (anything unlocked and unseen is NEW)
   endless: false,
   // entities
   slots: [null, null, null, null], // Player objects (persist across leave/rejoin)
@@ -27,8 +28,8 @@ export const G = {
   stats: null,
   market: null,
   clock: 0, // seconds of unpaused play; used to remember what was attacked recently
-  // the Trading Post coin jar, as a camera/alert target when raccoons rob it
-  jar: { pos: { x: 0, z: -17.6 }, kind: 'jar', dead: false, attackedAt: -99 },
+  // the Quick Sell coin jar, as a camera/alert target when raccoons rob it (placed by the market)
+  jar: { pos: { x: 0, z: -16.8 }, kind: 'jar', dead: false, attackedAt: -99 },
 };
 
 // Things the gardeners own that enemies hit in the last few seconds. The camera keeps them in view.

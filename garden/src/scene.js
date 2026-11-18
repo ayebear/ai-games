@@ -58,7 +58,7 @@ export function createScene(container) {
     const x = pos.getX(i), z = pos.getZ(i);
     const inside = Math.abs(x) < HALF - 4 && Math.abs(z) < HALF - 4;
     const n = Math.sin(x * 0.35) * Math.cos(z * 0.3) * 0.5 + Math.sin(x * 0.11 + z * 0.17) * 0.5;
-    if (inside) c.setHSL(0.27 + n * 0.02, 0.5, 0.42 + n * 0.04);
+    if (inside) c.setHSL(0.27 + n * 0.008, 0.48, 0.42 + n * 0.015);
     else c.setHSL(0.3 + n * 0.02, 0.45, 0.25 + n * 0.04);
     colors.push(c.r, c.g, c.b);
     if (!inside) pos.setY(i, Math.max(0, (Math.max(Math.abs(x), Math.abs(z)) - HALF) * 0.15) + n * 0.15);
@@ -69,20 +69,21 @@ export function createScene(container) {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Grass tufts (instanced)
+  // Grass tufts (instanced): sparse, short and close to the ground color so they stay in the
+  // background. Weeds, pickups and plants are what should catch the eye.
   {
-    const tuftGeo = new THREE.ConeGeometry(0.06, 0.35, 3);
-    tuftGeo.translate(0, 0.17, 0);
-    const N = 2200;
-    const tufts = new THREE.InstancedMesh(tuftGeo, new THREE.MeshStandardMaterial({ color: 0x5f9a35, roughness: 1 }), N);
+    const tuftGeo = new THREE.ConeGeometry(0.05, 0.22, 3);
+    tuftGeo.translate(0, 0.11, 0);
+    const N = 550;
+    const tufts = new THREE.InstancedMesh(tuftGeo, new THREE.MeshStandardMaterial({ color: 0x5c9634, roughness: 1 }), N);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
     for (let i = 0; i < N; i++) {
       const x = (Math.random() - 0.5) * 56, z = (Math.random() - 0.5) * 56;
-      if (Math.hypot(x, z) < 3 || z < -15.8) { i--; continue; } // not on the heart or the market floor
+      if (Math.hypot(x, z) < 3 || z < -14) { i--; continue; } // not on the heart or the market floor
       p.set(x, 0, z);
       e.set((Math.random() - 0.5) * 0.4, Math.random() * 6, (Math.random() - 0.5) * 0.4);
       q.setFromEuler(e);
-      s.setScalar(0.6 + Math.random() * 0.9);
+      s.setScalar(0.7 + Math.random() * 0.5);
       m.compose(p, q, s);
       tufts.setMatrixAt(i, m);
     }
@@ -148,7 +149,7 @@ export function createScene(container) {
   }
 
   // Stepping-stone path from shop to heart
-  for (let z = -15; z < -2.5; z += 1.6) P(scene, CYL(8), mat(0xbdb5a6), [Math.sin(z) * 0.3, 0.04, z], [0.5, 0.08, 0.45], [0, z, 0], false).receiveShadow = true;
+  for (let z = -13.4; z < -2.5; z += 1.6) P(scene, CYL(8), mat(0xbdb5a6), [Math.sin(z) * 0.3, 0.04, z], [0.5, 0.08, 0.45], [0, z, 0], false).receiveShadow = true;
 
   // ── Stars ──
   const starGeo = new THREE.BufferGeometry();

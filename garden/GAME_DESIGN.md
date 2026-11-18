@@ -70,7 +70,7 @@ hungry creatures come for your plants. Survive as many nights as you can. The go
 
 You start with **$0, bare hands, and an overgrown garden**:
 
-- **Weeds** are everywhere. Hold Interact to pull one. Weeds sell for $1 at the Quick Sell counter, or
+- **Weeds** (yellow dandelions) are everywhere. Hold Interact to pull one. Weeds sell for $1 at the Quick Sell kiosk, or
   can be fed to a Compost Bin later.
 - **Old junk** (boots, cans) is lying around and sells for $3.
 - A few **lost coins** sparkle in the grass.
@@ -80,7 +80,8 @@ You start with **$0, bare hands, and an overgrown garden**:
   before you own a shovel.
 
 Your first minute goes: pull weeds → sell → buy Daisy seeds ($3) → plant → water with dew →
-harvest → sell for profit → buy a **Shovel** (you each need one) → expand.
+harvest → sell for profit → buy a **Shovel** (you each need one) → expand. A Daisy triples your
+money; by Day 3 you'll want higher-tier seeds, which pay far more per plot.
 
 ---
 
@@ -101,41 +102,91 @@ reach ×4.5.
 
 ### Plants (seeds unlock as the days go on)
 
-| Plant | Seed | Grow | Base value | Special |
-|---|---|---|---|---|
-| 🌼 Daisy | $3 | fast | $27 | Hardy starter crop |
-| 🍓 Strawberry | $5 | fast | $22 | **Fruits again** after harvest |
-| 🏵️ Marigold | $6 | fast | $50 | **Aura:** repels flies and kills mites nearby |
-| 🥕 Carrot | $8 | medium | $72 | Sturdy, reliable money |
-| 🍅 Tomato | $10 | medium | $45 | **Fruits again** after harvest; tomatoes can be **thrown** at pests |
-| 🌻 Sunflower | $14 | slow | $125 | Sun-hungry; harvest also drops a free **Sun Jar** |
-| 🪴 Flytrap | $18 | medium | $150 | **Eats** flies and moths that come close (a living turret) |
-| 🌽 Corn | $20 | slow | $180 | Tall and sun-loving |
-| 🌹 Rose | $24 | slow | $220 | **Thorns** hurt anything that chews on it |
-| 🍉 Watermelon | $32 | slow | $290 | Thirsty; the melon swells up to ×3.2 |
-| 🎃 Giant Pumpkin | $40 | very slow | $360 | Thirsty; grows **enormous** (×4.5) |
+Plants come in five **tiers** of difficulty (how slow, thirsty, sun-hungry or fragile they are).
+**Crops** are grown for money; **helpers** also do a job in the garden.
 
-**Market:** each morning one crop is the **Hot Item** and sells for ×2 (its seed stall's board says 🔥 HOT).
-Bloom values are roughly **9× the seed price** at size ×1, and size multiplies that, so big crops scale hard.
-Regrowing crops (Tomato, Strawberry) pay about half that per harvest but keep fruiting.
+| Plant | Day | Tier | Seed | Sells | Special |
+|---|---|---|---|---|---|
+| 🌼 Daisy | 1 | 1 | $3 | $9 | Cheap and quick. The starter crop |
+| 🍓 Strawberry | 1 | 1 | $6 | $8 / harvest | **Regrows** after every harvest |
+| 🥕 Carrot | 2 | 2 | $8 | $32 | Sturdy, reliable money |
+| 🏵️ Marigold *(helper)* | 2 | 2 | $10 | $32 | **Aura:** repels flies and kills mites nearby |
+| 🍅 Tomato | 3 | 3 | $20 | $63 / harvest | **Regrows**; tomatoes can be **thrown** at pests |
+| 🌻 Sunflower *(helper)* | 3 | 3 | $18 | $79 | Sun-hungry; harvest also drops a free **Sun Jar** |
+| 🪴 Flytrap *(helper)* | 4 | 3 | $25 | $110 | **Eats** flies and moths that come close |
+| 🌽 Corn | 5 | 4 | $35 | $259 | Tall and sun-hungry |
+| 🌹 Rose *(helper)* | 6 | 4 | $45 | $266 | **Thorns** hurt anything that chews on it |
+| 🍉 Watermelon | 7 | 5 | $60 | $600 | Thirsty; swells up to ×2.6 |
+| 🎃 Giant Pumpkin | 9 | 5 | $90 | $900 | Slow, thirsty; grows **enormous** (×3.5) |
+
+### The economy
+
+The sell price is computed, not hand-picked (`plantValue` in `config.js`):
+
+- **Sale value = seed cost × tier multiplier.** The multiplier grows exponentially with
+  difficulty: **T1 ×3 · T2 ×4.05 · T3 ×5.5 · T4 ×7.4 · T5 ×10.** Since harder seeds also cost
+  more, profit climbs steeply: easy plants are safe but small, hard plants are where money is.
+- **Helpers** earn ×0.8 of that, because they also protect the garden.
+- **Regrowing plants** (Strawberry, Tomato) go back to the Growing stage after a harvest and pay
+  70% of a single crop's profit each time. That works out to about the same money per day as
+  replanting, minus the trips to the market.
+- On top of that: **size** (care after blooming keeps growing it, ×1 up to the plant's max),
+  **soil** (+12% per level), **Beehive** (+25%) and the **Hot Item** (×2 that day).
+
+Profit per plot per day on Dirt with good watering (run `npm run balance` for the full table):
+Daisy ~$12 · Strawberry ~$19 · Carrot ~$31 · Tomato/Flytrap ~$100 · Corn ~$210 · Watermelon ~$290 ·
+Pumpkin ~$330 (a ×3.5 Giant Pumpkin sells for $3,150).
 
 ---
 
 ## 4b. The Market (walk-in store)
 
-There are no shop menus. The north strip of the garden is a **market street**: every item has its own
-**stall** with a 3D display and a chalkboard price (red when you can't afford it, a tarp when it isn't
-unlocked yet, SOLD for owned upgrades). Walk up to a stall and a card shows what it does.
+There are no shop menus. The north strip of the garden is a **market** of eight shops. Each shop
+is a row of stalls under one **menu board**: a colored header with the shop's name, and one panel
+per item showing its icon, price and name. Every item has its own stall with the real item on the
+table. Walk up to a stall and a card shows what it does, what A and X do, and a few quick facts
+(for seeds: what it sells for, whether it regrows, how fast it grows).
 
-- **A buys** one. **X sells that item back** right there: a seed stall also buys that plant's produce,
-  gadget and supply stalls buy back their kits and supplies (half price), tool stalls buy back your tool.
-- Sections: Seeds and Supplies along the back, Garden gadgets on the back right; Tools, Weapons and
-  Upgrades along the front row, which has gaps so you can walk in from the garden.
-- **Quick Sell counter** (the Trading Post) at the front center buys *anything*, so you never have to go
+The market has three rows, all facing the garden, each reached from its south side:
+
+| Row | Shop | Sells |
+|---|---|---|
+| Back · *Grow* | 🌱 **Crop Seeds** | Daisy, Strawberry, Carrot, Tomato, Corn, Watermelon, Giant Pumpkin |
+| | 🏵️ **Helper Seeds** | Marigold, Sunflower, Flytrap, Rose |
+| | 🧪 **Plant Care** | Soil Bag, Fertilizer, Sun Jar, Heart Mulch |
+| | ⛲ **Farm Gadgets** | Rain Barrel, Compost Bin, Sprinkler, Sun Lamp, Beehive, Sell Stand |
+| Middle · *Gear* | 🧰 **Garden Tools** | Shovel, Watering Can, Garden Hose + their upgrades (Sharp Shovels, Golden Can, Soap Mixer) |
+| | 🎒 **Outfitter** | Bag (Big Pockets → Backpack → Wheelbarrow), Running Shoes, Strong Back, Bright Lanterns |
+| Front · *Defend* | 🎯 **Pest Control** | Fly Swatter, Soap Sprayer, Slingshot, Spud Gun, Seed Blaster + Hot Potatoes |
+| | 🛡️ **Defenses** | Fence, Beer Trap, Scarecrow, Ladybug House, Bug Zapper |
+
+- **A buys** one. **X sells that item back** right there: a seed stall also buys that plant's
+  produce, gadget and plant-care stalls buy back their goods (half price), tool stalls buy back
+  your tool.
+- **Price panels:** yellow price = you can afford it, orange = not yet. **Day N** = arrives on that
+  day (the table stays empty until then). **✔** = upgrade owned. **🔥 ×2** = today's Hot Item.
+- **★ NEW:** anything that unlocked after Day 1 gets a floating **★ NEW** tag over its stall, and
+  the shop header counts them (`★ 2 NEW`), until a gnome walks up and looks at it.
+- **Upgrade paths** share one stall: the Bag stall sells Big Pockets, then Backpack, then
+  Wheelbarrow.
+- A board **fades out** while a gnome stands in the aisle behind it, so you never lose sight of
+  your gnome.
+- **💰 Quick Sell kiosk** in the middle of the market buys *anything*, so you never have to go
   inside just to dump weeds and junk. It also holds the coin jar raccoons are after.
-- **Sell Stand** gadget ($150): your own quick-sell spot anywhere in the garden.
-- **At dusk the market closes**: you can still walk the aisles, but every stall shows CLOSED and
-  won't sell until dawn (the Quick Sell counter stays open).
+- **Sell Stand** gadget: your own quick-sell spot anywhere in the garden.
+- **At dusk the market closes**: shop headers say CLOSED and nothing is sold until dawn (the Quick
+  Sell kiosk stays open).
+
+### Visual language
+
+- **Icons** for tools, gadgets and supplies are rendered from the item's own 3D model with a white
+  sticker outline, so the icon on the board, the card, your HUD and the item in the world all
+  match. Plants use their emoji.
+- **Anything you can pick up** (dew, junk, coins, seeds, produce, supplies, gadget kits) sits on a
+  soft **white ring** (gold for coins). No ring = scenery.
+- **Weeds** are dandelions: dark jagged leaves with a bright yellow puff. Grass is short, sparse and
+  the same color as the ground.
+- A carried **gadget kit** shows a mini version of the gadget; a **seed packet** shows its plant.
 
 ## 4c. Camera
 
@@ -144,43 +195,51 @@ Bloom, gadgets, the coin jar), zooming out as far as needed. Attacked things get
 
 ---
 
-## 5. Tools & Weapons (bought per player at the Tools and Weapons stalls)
+## 5. Tools (bought per player)
 
-| Tool | Cost | Uses |
-|---|---|---|
-| ✋ Hands | free | Pull weeds, carry, harvest, weak punch |
-| ⛏️ Shovel | $10 | **Till** grass into plots · **dig out** weeds instantly · **bonk** pests · the only tool that hits **moles underground** |
-| 🚿 Watering Can | $14 | Fill at the pond or a Rain Barrel · hold to water · splash flies |
-| 🏓 Fly Swatter *(weapon)* | $8 | One-hit flies and moths · scatters crows · knocks mites off plants |
-| 🪃 Slingshot *(weapon)* | $20 | Quick pebble shots (3 dmg); great for flies and crows at range |
-| 🧴 Soap Sprayer | $16 | **Kills mites** · burns slugs · refills with water |
-| 🥔 Spud Gun *(weapon)* | $45 | Long-range potatoes: the **deer stopper** |
-| 🔫 Machine Gun *(weapon, Day 5)* | $200 | Hold to spray seed-bullets. **Overheats** after about 3 s, so fire in bursts. The heat meter is in your panel |
-| 🌊 Garden Hose | $60 | Endless water from the spigot (tethered, limited reach) · **blasts pests back** · with Soap Mixer it also kills mites and slugs · careful, it can **overwater** |
+**Garden Tools** shop:
 
-## 6. Garden Gadgets (shared, placed on the grid)
-
-| Gadget | Cost | What it does | Catch / combo |
+| Tool | Day | Cost | Uses |
 |---|---|---|---|
-| 🧱 Fence | $5 | Blocks deer, raccoons (and you) | Slugs slip under; deer chew through |
-| 🏷️ Sell Stand | $150 | A quick-sell spot in your garden: sell anything there | Pricey, but saves trips |
-| 👒 Scarecrow | $25 | Crows won't land within 8 m | — |
-| 💡 Sun Lamp | $30 | Sunlight at night, so plants **grow at night** · **deer avoid light** | **Attracts moths**, which attack it |
-| ⛲ Sprinkler | $35 | Waters everything nearby every few seconds | Wet soil **lures slugs**; can make plants soggy |
-| 🍺 Beer Trap | $8 | Lures and drowns slugs (4 uses) | Put it near your sprinklers |
-| 🛢️ Rain Barrel | $18 | A refill station closer than the pond | — |
-| ♻️ Compost Bin | $20 | 4 weeds become 1 free Soil Bag | Turns weeding into soil upgrades |
-| ⚡ Bug Zapper | $50 | Zaps flies and moths | Pairs with lamps to farm moth bounties |
-| 🐞 Ladybug House | $40 | Ladybugs eat mites nearby | — |
-| 🐝 Beehive | $60 | Nearby plants get +25 % size and value; bees sting flies | — |
+| ✋ Hands | — | free | Pull weeds, carry, harvest, weak punch |
+| Shovel | 1 | $10 | **Till** grass into plots · **dig out** weeds · **bonk** pests · the only tool that hits **moles underground** |
+| Watering Can | 1 | $12 | Fill at the pond or a Rain Barrel · hold to water · splash flies |
+| Garden Hose | 4 | $90 | Endless water from the spigot (tethered, limited reach) · **blasts pests back** · with Soap Mixer it also kills mites and slugs · careful, it can **overwater** |
 
-## 7. Supplies
+**Pest Control** shop:
 
-- 🟫 **Soil Bag ($7):** upgrade one plot's soil a level.
-- 🧪 **Fertilizer ($10):** instant growth spurt.
-- ☀️ **Sun Jar ($15):** use it on a plant for a big growth burst, or **throw it** to make a flash
+| Tool | Day | Cost | Uses |
+|---|---|---|---|
+| Fly Swatter | 1 | $6 | One-hit flies and moths · scatters crows · knocks mites off plants |
+| Soap Sprayer | 2 | $25 | **Kills mites** · burns slugs · refills with water |
+| Slingshot | 3 | $30 | Quick pebble shots; great for flies and crows at range |
+| Spud Gun | 3 | $60 | Long-range potatoes: the **deer stopper** |
+| Seed Blaster | 6 | $350 | Hold to spray seeds. **Overheats** after about 3 s, so fire in bursts. The heat meter is in your panel |
+
+## 6. Gadgets (shared, placed on the grid)
+
+| Gadget | Shop | Day | Cost | What it does | Catch / combo |
+|---|---|---|---|---|---|
+| Fence | Defenses | 1 | $4 | Blocks deer, raccoons (and you) | Slugs slip under; deer chew through |
+| 🍺 Beer Trap | Defenses | 1 | $6 | Lures and drowns slugs (4 uses) | Put it near your sprinklers |
+| Rain Barrel | Farm | 2 | $20 | A refill station closer than the pond | — |
+| Compost Bin | Farm | 2 | $25 | 4 weeds become 1 free Soil Bag | Turns weeding into soil upgrades |
+| Scarecrow | Defenses | 3 | $30 | Crows won't land within 8 m | — |
+| Sun Lamp | Farm | 3 | $40 | Sunlight at night, so plants **grow at night** · **deer avoid light** | **Attracts moths**, which attack it |
+| Sprinkler | Farm | 4 | $50 | Waters everything nearby every few seconds | Wet soil **lures slugs**; can make plants soggy |
+| 🐞 Ladybug House | Defenses | 4 | $60 | Ladybugs eat mites nearby | — |
+| Bug Zapper | Defenses | 5 | $90 | Zaps flies and moths | Pairs with lamps to farm moth bounties |
+| 🐝 Beehive | Farm | 6 | $150 | Nearby plants get +25 % size and value; bees sting flies | — |
+| Sell Stand | Farm | 7 | $250 | A quick-sell spot in your garden | Pricey, but saves trips |
+
+## 7. Plant Care (consumables)
+
+- **Soil Bag** (Day 1, $6): upgrade one plot's soil a level.
+- **Fertilizer** (Day 2, $10): instant growth spurt.
+- **Sun Jar** (Day 3, $20): use it on a plant for a big growth burst, or **throw it** to make a flash
   that **stuns every pest nearby and scares deer**. In daylight, a thrown jar boosts every plant it
   splashes.
+- **Heart Mulch** (Day 5, $150, one-time): Heart Bloom +150 max HP and faster healing.
 
 ## 8. The Bag (inventory) & Selling
 
@@ -192,15 +251,39 @@ Bloom, gadgets, the coin jar), zooming out as far as needed. Attacked things get
 - **Anything you can pick up sells at the counter.** Weeds and dew sell for $1, junk for $3, and
   produce for its size-based value (×2 if it's the Hot Item). Seeds, kits and supplies sell back
   for **half price**, so you can undo a bad purchase or cash out spare gear.
-- Bag upgrade path (shared): 👖 **Big Pockets** 10 → 🎒 **Backpack** 16 (needs Pockets, Day 3) →
-  🛒 **Wheelbarrow** 25 (needs Backpack, Day 6). 💪 **Strong Back** removes the slowdown.
+- Bag upgrades (one Outfitter stall, shared): 👖 **Big Pockets** 10 ($20, Day 1) → 🎒 **Backpack** 16
+  ($80, Day 3) → **Wheelbarrow** 25 ($300, Day 7). 💪 **Strong Back** removes the slowdown.
 
 ## 9. Upgrades (shared, one-time)
 
-👖🎒🛒 Bag upgrades (see above) · 💪 Strong Back · 👟 Running Shoes (+25 % speed) · 🏆 Golden Can (double capacity and
-faster pour) · 🗡️ Sharp Shovels (×2 damage, faster tilling) · 🧼 Soap Mixer (soapy hose) ·
-🏮 Bright Lanterns (your lanterns scare deer) · ❤️ Heart Mulch (+150 Heart HP, faster healing) ·
-🔥 Hot Potatoes (spud gun pierces and hits harder)
+| Upgrade | Shop | Day | Cost | Effect |
+|---|---|---|---|---|
+| 👖🎒 Bag path | Outfitter | 1 / 3 / 7 | $20 / $80 / $300 | Bag 5 → 10 → 16 → 25 |
+| 👟 Running Shoes | Outfitter | 2 | $40 | All gnomes +25 % speed |
+| 💪 Strong Back | Outfitter | 3 | $60 | No slowdown from a heavy bag |
+| 🏮 Bright Lanterns | Outfitter | 5 | $120 | Wider lantern light; lanterns scare deer |
+| Sharp Shovels | Garden Tools | 4 | $60 | ×2 shovel damage, faster swing |
+| Golden Can | Garden Tools | 4 | $70 | Cans hold double and pour faster |
+| 🧼 Soap Mixer | Garden Tools | 6 | $120 | Hose spray kills mites and burns slugs |
+| Hot Potatoes | Pest Control | 8 | $250 | Spud Gun hits harder and pierces |
+| 🌸 Heart Mulch | Plant Care | 5 | $150 | Heart Bloom +150 max HP, faster healing |
+
+### Unlock schedule
+
+New things arrive just before the threats they answer (flies on Day 2, crows and mites on Day 3,
+moles on Day 4; slugs on Night 1, moths on Night 2, deer on Night 3, raccoons on Night 4):
+
+| Day | New at the market |
+|---|---|
+| 1 | Daisy, Strawberry, Shovel, Watering Can, Fly Swatter, Fence, Beer Trap, Soil Bag, Big Pockets |
+| 2 | Carrot, Marigold, Soap Sprayer, Fertilizer, Rain Barrel, Compost Bin, Running Shoes |
+| 3 | Tomato, Sunflower, Slingshot, Spud Gun, Sun Jar, Scarecrow, Sun Lamp, Backpack, Strong Back |
+| 4 | Flytrap, Garden Hose, Sprinkler, Ladybug House, Sharp Shovels, Golden Can |
+| 5 | Corn, Bug Zapper, Bright Lanterns, Heart Mulch |
+| 6 | Rose, Seed Blaster, Beehive, Soap Mixer |
+| 7 | Watermelon, Sell Stand, Wheelbarrow |
+| 8 | Hot Potatoes |
+| 9 | Giant Pumpkin |
 
 ---
 

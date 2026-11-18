@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
 import { G, newStats, activePlayers, attackedThings, rand, pick, clamp, dist2 } from './state.js';
-import { World, spawnPickup, updatePickups } from './world.js';
+import { World, spawnPickup, removePickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
 import { Player } from './players.js';
 import { Director, flashAt } from './enemies.js';
 import { updateSky } from './scene.js';
 import { sfx } from './audio.js';
 import { Market } from './market.js';
+import { iconHTML, stallIconId } from './icons.js';
 
 const EMPTY = { mx: 0, mz: 0, ax: 0, az: 0, held: {}, pressed: {}, nav: {} };
 
@@ -29,7 +30,7 @@ export class Game {
     const sc = G.scene;
     for (const p of G.plants) sc.remove(p.root);
     for (const e of G.enemies) sc.remove(e.model.group);
-    for (const p of G.pickups) sc.remove(p.mesh);
+    for (const p of G.pickups) removePickup(p);
     for (const p of G.placeables) sc.remove(p.model.group);
     for (const p of G.projectiles) sc.remove(p.mesh);
     if (G.heart) sc.remove(G.heart.model.group);
@@ -40,7 +41,7 @@ export class Game {
     G.plants = []; G.enemies = []; G.pickups = []; G.placeables = []; G.projectiles = []; G.flashes = [];
     G.heart = new Heart();
     G.money = 0; G.day = 1; G.time = 0; G.phase = 'day';
-    G.upgrades = new Set(); G.stats = newStats();
+    G.upgrades = new Set(); G.seen = new Set(); G.stats = newStats();
     G.weather = 'clear'; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
     G.jar.attackedAt = -99;
     G.director.reset();
@@ -68,7 +69,7 @@ export class Game {
     G.state = 'playing';
     G.hud.hideScreen();
     sfx('dawn');
-    G.fx.toast('☀️ Day 1', 'Pull weeds 🌿 &amp; grab junk 🥾 → sell at the Quick Sell counter → walk the market stalls to buy seeds 🌱. Water with morning dew 💧!');
+    G.fx.toast('☀️ Day 1', 'Pull weeds 🌿 and grab junk → sell at the 💰 Quick Sell kiosk → buy 🌼 Daisy seeds at Crop Seeds. Water with morning dew 💧!');
   }
 
   // ───────────── Join / leave ─────────────
@@ -216,7 +217,8 @@ export class Game {
     G.director.onDawn();
     sfx('dawn');
     const wtxt = { clear: 'Clear skies', rain: '🌧️ Rain: plants drink, half sun, no dew', heat: '🔥 Heatwave: water evaporates 2× faster' }[G.weather];
-    const fresh = [PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES].flatMap((o) => Object.values(o).filter((d) => d.unlock === G.day).map((d) => d.icon + ' ' + d.name));
+    const fresh = Object.entries({ seed: PLANTS, tool: TOOLS, kit: PLACEABLES, supply: SUPPLIES, upgrade: UPGRADES })
+      .flatMap(([kind, defs]) => Object.entries(defs).filter(([, d]) => d.unlock === G.day).map(([key, d]) => `${iconHTML(stallIconId(kind, key))} ${d.name}`));
     G.fx.toast(`☀️ Day ${G.day} — Night ${G.day - 1} survived!`, `${wtxt} · Hot item: ${PLANTS[G.hotItem].icon} ${PLANTS[G.hotItem].name} sells ×2${fresh.length ? '<br>New at the market: ' + fresh.join(', ') : ''}`);
     if (G.day % 10 === 0) setTimeout(() => G.fx.toast('⚠️ Tonight is a full moon…', 'Something big is coming. Prepare!', 'danger'), 2500);
   }

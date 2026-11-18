@@ -59,6 +59,10 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .tools small { font-size: 10px; opacity: 0.6; padding: 0 2px; }
 .tool { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 2px solid transparent; font-size: 15px; opacity: 0.6; }
 .tool.on { border-color: var(--pc); background: rgba(255, 255, 255, 0.2); opacity: 1; transform: scale(1.1); }
+.tool .ico { width: 22px; height: 22px; vertical-align: 0; }
+/* Item icons: a rendered model (img) or an emoji (span.e), sized to the surrounding text */
+.ico { display: inline-block; width: 1.4em; height: 1.4em; vertical-align: -0.38em; object-fit: contain; }
+.ico.e { width: auto; height: auto; vertical-align: baseline; }
 .tname { font-size: 12px; opacity: 0.85; margin-top: 3px; }
 .meter { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .carry { margin-top: 5px; font-size: 13px; }
@@ -81,17 +85,18 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .leave { color: #ff8a80; font-weight: 700; margin-top: 3px; }
 
 /* ── Market stall card (floats over the stall you're browsing) ── */
-.stall { width: 230px; background: rgba(12, 16, 12, 0.88); border: 2px solid var(--pc, #fff); border-top: 5px solid var(--sc); border-radius: 12px; padding: 7px 10px; color: #fff; font-size: 12px; line-height: 1.35; }
-.stall .sh { display: flex; align-items: center; gap: 6px; font-size: 14px; }
-.stall .si { font-size: 20px; }
+.stall { width: 240px; background: rgba(12, 16, 12, 0.9); border: 2px solid var(--pc, #fff); border-top: 6px solid var(--sc); border-radius: 12px; padding: 7px 10px 8px; color: #fff; font-size: 12px; line-height: 1.35; }
+.stall .sh { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.stall .sh .si { width: 34px; height: 34px; font-size: 24px; vertical-align: middle; }
 .stall .sh b { flex: 1; }
-.stall .sp { color: #ffd54f; font-weight: 800; font-size: 15px; }
+.stall .new { font-style: normal; background: #ffd600; color: #3e2723; border-radius: 5px; padding: 0 4px; font-size: 10px; vertical-align: 2px; }
+.stall .sp { color: #ffd54f; font-weight: 800; font-size: 17px; }
 .stall .sp.no { color: #ff8a65; }
-.stall .sd { opacity: 0.85; margin: 3px 0 5px; }
+.stall .sd { opacity: 0.9; margin: 4px 0 5px; }
+.stall .sf { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.stall .sf span { background: rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 1px 6px; font-size: 11px; }
 .stall .sa { display: flex; align-items: center; gap: 6px; font-weight: 700; margin-top: 3px; }
-.stall .sa.no { color: #ffab91; }
 .stall .sa.sell { color: #c5e1a5; }
-.stall .sa.hint { font-weight: 400; opacity: 0.7; font-size: 11px; }
 .alarm { background: #3a0d0d; border: 2px solid #ff5252; color: #fff; border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700; white-space: nowrap; animation: bob 0.8s ease-in-out infinite; }
 .alarm span { font-size: 11px; }
 
@@ -103,6 +108,9 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .prompt .ga { color: #7dff8a; }
 .prompt .gx { color: #6ec6ff; }
 .prompt .x { opacity: 0.85; }
+/* Disabled action: the button and text stay where they'd be, faded and grey */
+.prompt .off, .stall .sa.off { opacity: 0.45; color: #cfd8dc; font-weight: 400; }
+.prompt .off .btn, .stall .sa.off .btn { filter: grayscale(1); }
 .prompt .hold { height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; margin: 2px 0 1px; }
 .prompt .hold i { display: block; height: 100%; background: #7dff8a; border-radius: 3px; }
 /* Plant readout: no background at all, just ringed icons floating over the plant */

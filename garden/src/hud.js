@@ -3,6 +3,7 @@ import { DAY_LEN, NIGHT_LEN, PLAYER_CSS, PLAYER_NAMES, TOOLS, PLANTS, SOIL, ENEM
 import { G, activePlayers, attackedThings } from './state.js';
 import { glyphsFor, padBtn, keyBtn } from './input.js';
 import { STAGE_NAMES } from './plants.js';
+import { iconHTML } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const setHTML = (el, html) => { if (el._h !== html) { el._h = html; el.innerHTML = html; } };
@@ -77,14 +78,14 @@ export class HUD {
     }
     el.className = `panel p${i}`;
     const g = glyphsFor(p.device);
-    const tools = p.tools.map((t, k) => `<span class="tool ${k === p.toolIdx ? 'on' : ''}" title="${TOOLS[t].name}">${TOOLS[t].icon}</span>`).join('');
+    const tools = p.tools.map((t, k) => `<span class="tool ${k === p.toolIdx ? 'on' : ''}" title="${TOOLS[t].name}">${t === 'hands' ? TOOLS.hands.icon : iconHTML('tool:' + t)}</span>`).join('');
     const tool = p.tool;
     let meter = '';
     if (tool === 'can') meter = this.meter('💧', p.can / (CAN_CAP * (G.upgrades.has('bigcan') ? 2 : 1)), '#4fc3f7');
     if (tool === 'spray') meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
     if (tool === 'mgun') meter = this.meter(p.overheat ? '🔥' : '🌡️', p.heat || 0, p.overheat ? '#ff5252' : '#ffb74d');
     const c = p.carry;
-    const carry = c ? `<div class="carry">${itemInfo(c.kind).icon} ${itemInfo(c.kind).name} <b>×${c.count}</b>${c.kind.startsWith('produce') ? ` <small>$${Math.round(c.value)}</small>` : ''}</div>` : `<div class="carry dim">Hands free</div>`;
+    const carry = c ? `<div class="carry">${iconHTML(c.kind)} ${itemInfo(c.kind).name} <b>×${c.count}</b>${c.kind.startsWith('produce') ? ` <small>$${Math.round(c.value)}</small>` : ''}</div>` : `<div class="carry dim">Hands free</div>`;
     const lr = p.loadRatio;
     const lcol = lr >= 1 ? '#ff5252' : lr >= 0.7 ? '#ffb74d' : '#9ccc65';
     const slow = p.loadSlow > 0.02 ? ` <span class="slow">−${Math.round(p.loadSlow * 100)}% speed</span>` : '';
@@ -133,9 +134,9 @@ export class HUD {
       const parts = [];
       if (p.ctx) {
         const hold = p.ctx.hold ? `<div class="hold"><i style="width:${(p.holdT / p.ctx.hold) * 100}%"></i></div>` : '';
-        parts.push(`<div>${g.a} ${p.ctx.hold ? 'Hold: ' : ''}${p.ctx.label}${hold}</div>`);
+        parts.push(`<div class="${p.ctx.off ? 'off' : ''}">${g.a} ${p.ctx.hold ? 'Hold: ' : ''}${p.ctx.label}${hold}</div>`);
       }
-      if (p.xLabel && p.tool !== 'hands') parts.push(`<div class="x">${g.x} ${p.xLabel}</div>`);
+      if (p.xLabel && p.tool !== 'hands') parts.push(`<div class="x ${p.xOff ? 'off' : ''}">${g.x} ${p.xLabel}</div>`);
       setHTML(pr, parts.join(''));
       pr.style.borderColor = PLAYER_CSS[i];
       if (parts.length) this.project(p.pos, 3.0, pr); else pr.style.display = 'none';
@@ -279,7 +280,7 @@ export class HUD {
 function purchases(p) {
   const list = Object.values(p.stats.bought).sort((a, b) => b.spent - a.spent);
   if (!list.length) return '<div class="buys"><div class="bh">🛍️ Bought nothing</div></div>';
-  const rows = list.map((r) => `<div class="br"><span>${r.icon} ${r.name}${r.n > 1 ? ` <b>×${r.n}</b>` : ''}</span><span>$${r.spent}</span></div>`).join('');
+  const rows = list.map((r) => `<div class="br"><span>${iconHTML(r.icon)} ${r.name}${r.n > 1 ? ` <b>×${r.n}</b>` : ''}</span><span>$${r.spent}</span></div>`).join('');
   return `<div class="buys"><div class="bh">🛍️ Bought ${list.reduce((s, r) => s + r.n, 0)} items · <b>$${Math.round(p.stats.spent)}</b></div>${rows}</div>`;
 }
 

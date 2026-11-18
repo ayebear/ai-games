@@ -12,7 +12,6 @@ export const PLAYER_COLORS = [0xe8453c, 0x3b8fe0, 0xf2c230, 0x3fbf5f];
 export const PLAYER_CSS = ['#ff5a4f', '#4aa3ff', '#ffd23f', '#4fd672'];
 export const PLAYER_NAMES = ['Red', 'Blue', 'Yellow', 'Green'];
 
-export const COUNTER = { x: 0, z: -16.6 }; // shop counter / coin jar
 export const SPIGOT = { x: 7, z: -13 };
 export const POND = { x: -19.5, z: 19.5, r: 4.3 };
 export const HOSE_LEN = 26;
@@ -25,98 +24,127 @@ export const SOIL = [
   { name: 'Magic', mult: 1.9, color: 0x4a2a55 },
 ];
 
-// ───────────────────────── Plants ─────────────────────────
-// value = base sale price of a bloom at size ×1 (≈9× the seed). Regrowing crops pay less per harvest.
-export const PLANTS = {
-  daisy: { name: 'Daisy', icon: '🌼', cost: 3, grow: 38, value: 27, hp: 20, maxSize: 1.6, unlock: 1, desc: 'Cheap & quick. Hardy starter crop.' },
-  strawberry: { name: 'Strawberry', icon: '🍓', cost: 5, grow: 42, value: 22, hp: 18, maxSize: 1.6, unlock: 1, regrow: true, desc: 'Low bush that fruits again after every harvest.' },
-  marigold: { name: 'Marigold', icon: '🏵️', cost: 6, grow: 48, value: 50, hp: 25, maxSize: 1.5, unlock: 1, aura: 4.5, desc: 'Grown marigolds repel flies & kill mites nearby.' },
-  carrot: { name: 'Carrot', icon: '🥕', cost: 8, grow: 50, value: 72, hp: 28, maxSize: 1.8, unlock: 2, desc: 'Sturdy root crop. Reliable money.' },
-  tomato: { name: 'Tomato', icon: '🍅', cost: 10, grow: 60, value: 45, hp: 30, maxSize: 1.8, unlock: 2, regrow: true, desc: 'Fruits again after harvest. Throw tomatoes at pests!' },
-  sunflower: { name: 'Sunflower', icon: '🌻', cost: 14, grow: 80, value: 125, hp: 30, maxSize: 2.2, unlock: 2, sunNeed: 1.8, desc: 'Sun-hungry. Harvest drops a free Sun Jar.' },
-  flytrap: { name: 'Flytrap', icon: '🪴', cost: 18, grow: 55, value: 150, hp: 35, maxSize: 1.5, unlock: 3, eats: 3.4, desc: 'Living turret: snaps flies & moths that come close.' },
-  corn: { name: 'Corn', icon: '🌽', cost: 20, grow: 85, value: 180, hp: 35, maxSize: 2.0, unlock: 3, sunNeed: 1.4, desc: 'Tall stalks that love the sun. Sells well.' },
-  rose: { name: 'Rose', icon: '🌹', cost: 24, grow: 75, value: 220, hp: 40, maxSize: 1.8, unlock: 4, thorns: 4, desc: 'Valuable. Thorns hurt pests that chew on it.' },
-  watermelon: { name: 'Watermelon', icon: '🍉', cost: 32, grow: 120, value: 290, hp: 60, maxSize: 3.2, unlock: 4, thirsty: 1.3, bigFruit: true, desc: 'Thirsty vine. The melon swells huge with care.' },
-  pumpkin: { name: 'Giant Pumpkin', icon: '🎃', cost: 40, grow: 160, value: 360, hp: 70, maxSize: 4.5, unlock: 5, thirsty: 1.5, bigFruit: true, desc: 'Slow & thirsty. Grows ENORMOUS with care.' },
+// ───────────────────────── Plant economy ─────────────────────────
+// Sale value of a bloom (size ×1, Dirt) = seed cost × TIER_MULT[tier]. The multiplier grows
+// exponentially with how hard a plant is to grow and keep alive, so tier-1 starters pay 3× and
+// tier-5 giants pay 10× (before size, soil, hive and Hot Item bonuses).
+export const TIER_MULT = [0, 3, 4.05, 5.5, 7.4, 10];
+// Helper plants also do a job in the garden (repel, eat, sting, drop sun jars) so they pay less.
+export const HELPER_K = 0.8;
+// Regrowing plants go back to the Growing stage after harvest (REGROW_AT) and pay part of the
+// single-harvest profit each time, so per-day profit matches a single crop without replanting.
+export const REGROW_AT = 0.4;
+export const REGROW_K = 0.7;
+export function plantValue(d) {
+  const v = d.cost * TIER_MULT[d.tier] * (d.role === 'helper' ? HELPER_K : 1);
+  return Math.round(d.regrow ? REGROW_K * (v - d.cost) : v);
+}
+
+// grow = seconds to bloom at Loam in full sun with good water. tier = difficulty 1..5.
+// role: crop (grown for money) or helper (does something useful too).
+const PLANT_DEFS = {
+  daisy: { name: 'Daisy', icon: '🌼', tier: 1, role: 'crop', cost: 3, grow: 36, hp: 20, maxSize: 1.5, unlock: 1, desc: 'Cheap and quick. The starter crop.' },
+  strawberry: { name: 'Strawberry', icon: '🍓', tier: 1, role: 'crop', cost: 6, grow: 50, hp: 18, maxSize: 1.4, unlock: 1, regrow: true, desc: 'Fruits again after every harvest.' },
+  carrot: { name: 'Carrot', icon: '🥕', tier: 2, role: 'crop', cost: 8, grow: 55, hp: 28, maxSize: 1.7, unlock: 2, desc: 'Sturdy root. Reliable money.' },
+  marigold: { name: 'Marigold', icon: '🏵️', tier: 2, role: 'helper', cost: 10, grow: 50, hp: 25, maxSize: 1.5, unlock: 2, aura: 4.5, desc: 'Repels flies and kills mites nearby.' },
+  tomato: { name: 'Tomato', icon: '🍅', tier: 3, role: 'crop', cost: 20, grow: 70, hp: 30, maxSize: 1.6, unlock: 3, regrow: true, desc: 'Fruits again. Throw tomatoes at pests.' },
+  sunflower: { name: 'Sunflower', icon: '🌻', tier: 3, role: 'helper', cost: 18, grow: 80, hp: 30, maxSize: 2.0, unlock: 3, sunNeed: 1.8, desc: 'Needs lots of sun. Drops a free Sun Jar.' },
+  flytrap: { name: 'Flytrap', icon: '🪴', tier: 3, role: 'helper', cost: 25, grow: 60, hp: 35, maxSize: 1.5, unlock: 4, eats: 3.4, desc: 'Snaps up flies and moths nearby.' },
+  corn: { name: 'Corn', icon: '🌽', tier: 4, role: 'crop', cost: 35, grow: 105, hp: 35, maxSize: 2.0, unlock: 5, sunNeed: 1.4, desc: 'Tall and sun-hungry. Sells well.' },
+  rose: { name: 'Rose', icon: '🌹', tier: 4, role: 'helper', cost: 45, grow: 90, hp: 40, maxSize: 1.8, unlock: 6, thorns: 4, desc: 'Thorns hurt anything that bites it.' },
+  watermelon: { name: 'Watermelon', icon: '🍉', tier: 5, role: 'crop', cost: 60, grow: 130, hp: 60, maxSize: 2.6, unlock: 7, thirsty: 1.3, bigFruit: true, desc: 'Thirsty. Keeps swelling with care.' },
+  pumpkin: { name: 'Giant Pumpkin', icon: '🎃', tier: 5, role: 'crop', cost: 90, grow: 170, hp: 70, maxSize: 3.5, unlock: 9, thirsty: 1.5, bigFruit: true, desc: 'Slow and thirsty. Grows enormous.' },
 };
+for (const d of Object.values(PLANT_DEFS)) d.value = plantValue(d);
+export const PLANTS = PLANT_DEFS;
 
 // ───────────────────────── Tools (per player) ─────────────────────────
+// Garden tools grow things; pest control (weapon: true) fights things.
 export const TOOLS = {
   hands: { name: 'Hands', icon: '✋', cost: 0, unlock: 1, desc: 'Pull weeds, carry, harvest. Weak punch.' },
-  shovel: { name: 'Shovel', icon: '⛏️', cost: 10, unlock: 1, desc: 'Till grass into plots, dig weeds, bonk pests. Hits moles underground.' },
-  can: { name: 'Watering Can', icon: '🚿', cost: 14, unlock: 1, desc: 'Fill at pond/barrel, hold to water. Splashes flies.' },
-  swatter: { name: 'Fly Swatter', icon: '🏓', cost: 8, unlock: 1, weapon: true, desc: 'One-swat flies & moths. Scatters crows, knocks off mites.' },
-  spray: { name: 'Soap Sprayer', icon: '🧴', cost: 16, unlock: 2, desc: 'Kills mites, burns slugs. Refill with water.' },
-  slingshot: { name: 'Slingshot', icon: '🪃', cost: 20, unlock: 1, weapon: true, desc: 'Quick pebble shots. Great for picking off flies & crows at range.' },
-  gun: { name: 'Spud Gun', icon: '🥔', cost: 45, unlock: 3, weapon: true, desc: 'Long-range potato cannon. The deer stopper.' },
-  mgun: { name: 'Machine Gun', icon: '🔫', cost: 200, unlock: 5, weapon: true, desc: 'Hold to spray seed-bullets. Overheats, so fire in bursts!' },
-  hose: { name: 'Garden Hose', icon: '🌊', cost: 60, unlock: 3, desc: 'Endless water from the spigot. Blasts pests back. Can overwater!' },
+  shovel: { name: 'Shovel', icon: '⛏️', cost: 10, unlock: 1, desc: 'Till plots, dig weeds, bonk pests and moles.' },
+  can: { name: 'Watering Can', icon: '🚿', cost: 12, unlock: 1, desc: 'Fill at the pond or a barrel. Hold to water.' },
+  hose: { name: 'Garden Hose', icon: '🌊', cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
+  swatter: { name: 'Fly Swatter', icon: '🏓', cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
+  spray: { name: 'Soap Sprayer', icon: '🧴', cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
+  slingshot: { name: 'Slingshot', icon: '🪃', cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
+  gun: { name: 'Spud Gun', icon: '🥔', cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
+  mgun: { name: 'Seed Blaster', icon: '🔫', cost: 350, unlock: 6, weapon: true, desc: 'Hold to spray seeds. Overheats: fire in bursts.' },
 };
 export const CAN_CAP = 3;
 export const SPRAY_CAP = 25;
 
-// ───────────────────────── Placeables (shared) ─────────────────────────
+// ───────────────────────── Gadgets (shared, placed on the grid) ─────────────────────────
 export const PLACEABLES = {
-  fence: { name: 'Fence', icon: '🧱', cost: 5, hp: 45, blocks: true, unlock: 1, desc: 'Blocks deer, raccoons & gnomes. Slugs slip under.' },
-  sellbox: { name: 'Sell Stand', icon: '🏷️', cost: 150, hp: 60, blocks: true, unlock: 1, desc: 'Your own quick-sell spot. Sell anything right in the garden.' },
-  beertrap: { name: 'Beer Trap', icon: '🍺', cost: 8, hp: 20, radius: 5.5, uses: 4, unlock: 1, desc: 'Lures and drowns slugs (4 uses).' },
-  barrel: { name: 'Rain Barrel', icon: '🛢️', cost: 18, hp: 50, blocks: true, unlock: 1, desc: 'Refill station for cans & sprayers.' },
-  compost: { name: 'Compost Bin', icon: '♻️', cost: 20, hp: 50, blocks: true, unlock: 1, desc: 'Feed it 4 weeds → get 1 free Soil Bag.' },
-  scarecrow: { name: 'Scarecrow', icon: '👒', cost: 25, hp: 60, blocks: true, radius: 8, unlock: 2, desc: "Crows won't land nearby." },
-  lamp: { name: 'Sun Lamp', icon: '💡', cost: 30, hp: 40, blocks: true, radius: 5.5, unlock: 2, desc: 'Plants grow at night. Deer fear it. Moths LOVE it.' },
-  sprinkler: { name: 'Sprinkler', icon: '⛲', cost: 35, hp: 30, radius: 4.3, unlock: 3, desc: 'Auto-waters nearby. Wet soil lures slugs!' },
-  ladybugs: { name: 'Ladybug House', icon: '🐞', cost: 40, hp: 40, blocks: true, radius: 6, unlock: 3, desc: 'Ladybugs devour mites nearby.' },
-  zapper: { name: 'Bug Zapper', icon: '⚡', cost: 50, hp: 40, blocks: true, radius: 5.5, unlock: 4, desc: 'Zaps flies & moths in range.' },
-  beehive: { name: 'Beehive', icon: '🐝', cost: 60, hp: 50, blocks: true, radius: 7, unlock: 5, desc: '+25% size & value nearby. Bees sting flies.' },
+  fence: { name: 'Fence', icon: '🧱', cost: 4, hp: 45, blocks: true, unlock: 1, desc: 'Blocks deer and raccoons. Slugs slip under.' },
+  beertrap: { name: 'Beer Trap', icon: '🍺', cost: 6, hp: 20, radius: 5.5, uses: 4, unlock: 1, desc: 'Lures and drowns slugs. 4 uses.' },
+  barrel: { name: 'Rain Barrel', icon: '🛢️', cost: 20, hp: 50, blocks: true, unlock: 2, desc: 'Refill cans and sprayers here.' },
+  compost: { name: 'Compost Bin', icon: '♻️', cost: 25, hp: 50, blocks: true, unlock: 2, desc: 'Feed it 4 weeds, get 1 Soil Bag.' },
+  scarecrow: { name: 'Scarecrow', icon: '👒', cost: 30, hp: 60, blocks: true, radius: 8, unlock: 3, desc: "Crows won't land nearby." },
+  lamp: { name: 'Sun Lamp', icon: '💡', cost: 40, hp: 40, blocks: true, radius: 5.5, unlock: 3, desc: 'Plants grow at night. Scares deer. Draws moths.' },
+  sprinkler: { name: 'Sprinkler', icon: '⛲', cost: 50, hp: 30, radius: 4.3, unlock: 4, desc: 'Waters nearby plants. Wet soil draws slugs.' },
+  ladybugs: { name: 'Ladybug House', icon: '🐞', cost: 60, hp: 40, blocks: true, radius: 6, unlock: 4, desc: 'Ladybugs eat mites nearby.' },
+  zapper: { name: 'Bug Zapper', icon: '⚡', cost: 90, hp: 40, blocks: true, radius: 5.5, unlock: 5, desc: 'Zaps flies and moths in range.' },
+  beehive: { name: 'Beehive', icon: '🐝', cost: 150, hp: 50, blocks: true, radius: 7, unlock: 6, desc: 'Nearby plants +25% size and value.' },
+  sellbox: { name: 'Sell Stand', icon: '🏷️', cost: 250, hp: 60, blocks: true, unlock: 7, desc: 'Sell anything right in your garden.' },
 };
 
-// ───────────────────────── Supplies ─────────────────────────
+// ───────────────────────── Plant care (consumables) ─────────────────────────
 export const SUPPLIES = {
-  soil: { name: 'Soil Bag', icon: '🟫', cost: 7, unlock: 1, desc: "Upgrade a plot's soil one level." },
+  soil: { name: 'Soil Bag', icon: '🟫', cost: 6, unlock: 1, desc: 'Upgrade a plot one soil level.' },
   fertilizer: { name: 'Fertilizer', icon: '🧪', cost: 10, unlock: 2, desc: 'Instant growth spurt for one plant.' },
-  sunjar: { name: 'Sun Jar', icon: '☀️', cost: 15, unlock: 2, desc: 'Use on a plant to boost it, or THROW at night to stun pests.' },
+  sunjar: { name: 'Sun Jar', icon: '☀️', cost: 20, unlock: 3, desc: 'Boost a plant, or throw it to stun pests.' },
 };
 
 // ───────────────────────── Upgrades (shared, one-time) ─────────────────────────
 export const UPGRADES = {
-  pockets: { name: 'Big Pockets', icon: '👖', cost: 25, unlock: 1, desc: 'Bag capacity 5 → 10.' },
-  backpack: { name: 'Backpack', icon: '🎒', cost: 60, unlock: 3, requires: 'pockets', desc: 'Bag capacity 10 → 16.' },
-  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 120, unlock: 6, requires: 'backpack', desc: 'Bag capacity 16 → 25. Haul pumpkins with ease.' },
-  strongback: { name: 'Strong Back', icon: '💪', cost: 40, unlock: 2, desc: 'No more slowdown when your bag is heavy.' },
-  shoes: { name: 'Running Shoes', icon: '👟', cost: 30, unlock: 2, desc: 'All gnomes move 25% faster.' },
-  bigcan: { name: 'Golden Can', icon: '🏆', cost: 40, unlock: 2, desc: 'Cans hold double and pour faster.' },
-  sharp: { name: 'Sharp Shovels', icon: '🗡️', cost: 35, unlock: 3, desc: 'Shovels hit twice as hard and swing faster.' },
-  soaphose: { name: 'Soap Mixer', icon: '🧼', cost: 40, unlock: 3, desc: 'Hose spray kills mites & burns slugs.' },
-  lanterns: { name: 'Bright Lanterns', icon: '🏮', cost: 45, unlock: 3, desc: 'Gnome lanterns shine wider and scare deer.' },
-  mulch: { name: 'Heart Mulch', icon: '❤️', cost: 60, unlock: 4, desc: 'Heart Bloom +150 max HP & heals faster.' },
-  potato: { name: 'Hot Potatoes', icon: '🔥', cost: 70, unlock: 6, desc: 'Spud gun hits harder and pierces.' },
+  pockets: { name: 'Big Pockets', icon: '👖', cost: 20, unlock: 1, desc: 'Bag holds 10 (was 5).' },
+  backpack: { name: 'Backpack', icon: '🎒', cost: 80, unlock: 3, requires: 'pockets', desc: 'Bag holds 16.' },
+  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 300, unlock: 7, requires: 'backpack', desc: 'Bag holds 25.' },
+  shoes: { name: 'Running Shoes', icon: '👟', cost: 40, unlock: 2, desc: 'All gnomes run 25% faster.' },
+  strongback: { name: 'Strong Back', icon: '💪', cost: 60, unlock: 3, desc: 'No slowdown from a heavy bag.' },
+  lanterns: { name: 'Bright Lanterns', icon: '🏮', cost: 120, unlock: 5, desc: 'Wider lantern light. Scares deer.' },
+  bigcan: { name: 'Golden Can', icon: '🏆', cost: 70, unlock: 4, desc: 'Cans hold double and pour faster.' },
+  sharp: { name: 'Sharp Shovels', icon: '🗡️', cost: 60, unlock: 4, desc: 'Shovels hit 2× harder and swing faster.' },
+  soaphose: { name: 'Soap Mixer', icon: '🧼', cost: 120, unlock: 6, desc: 'Hose spray kills mites and burns slugs.' },
+  potato: { name: 'Hot Potatoes', icon: '🔥', cost: 250, unlock: 8, desc: 'Spud Gun hits harder and pierces.' },
+  mulch: { name: 'Heart Mulch', icon: '🌸', cost: 150, unlock: 5, desc: 'Heart Bloom +150 max HP, heals faster.' },
 };
 
 // ───────────────────────── Market (walk-in store) ─────────────────────────
-// The market fills the north strip of the garden (grid rows j0..j1). Every item has its own stall:
-// walk up to it to buy (A) or sell that item back (X). The Trading Post kiosk at the front center
-// buys anything (quick sell) and holds the coin jar raccoons go for.
-export const MARKET = { j0: 2, j1: 6, kiosk: { i0: 14, i1: 15, j0: 4, j1: 5 }, plaza: { i0: 14, i1: 15, j: 6 }, front: -15.2 };
-export const SECTIONS = {
-  seeds: { name: 'SEEDS', hex: 0x43a047, css: '#7cc554' },
-  supplies: { name: 'SUPPLIES', hex: 0x8e5bb5, css: '#c39be0' },
-  garden: { name: 'GARDEN', hex: 0x2f86d6, css: '#74b9f0' },
-  tools: { name: 'TOOLS', hex: 0xb5793a, css: '#e0a46a' },
-  weapons: { name: 'WEAPONS', hex: 0xd84336, css: '#ff8a7a' },
-  upgrades: { name: 'UPGRADES', hex: 0xe6a817, css: '#ffd54f' },
-};
-const range = (a, b) => Array.from({ length: b - a + 1 }, (_, k) => a + k);
-const stallRow = (section, kind, keys, j, cols) => keys.map((key, n) => ({ section, kind, key, i: cols[n], j }));
-// Back row (j=2) faces the aisle; front row (j=6) has gaps so you can walk in from the garden.
-export const STALLS = [
-  ...stallRow('seeds', 'seed', Object.keys(PLANTS), 2, range(2, 12)),
-  ...stallRow('supplies', 'supply', Object.keys(SUPPLIES), 2, range(13, 15)),
-  ...stallRow('garden', 'kit', Object.keys(PLACEABLES), 2, range(16, 26)),
-  ...stallRow('tools', 'tool', ['shovel', 'can', 'spray', 'hose'], 6, range(3, 6)),
-  ...stallRow('weapons', 'tool', ['swatter', 'slingshot', 'gun', 'mgun'], 6, range(9, 12)),
-  ...stallRow('upgrades', 'upgrade', Object.keys(UPGRADES), 6, range(17, 27)),
+// Every item is sold at its own stall. Stalls are grouped into shops by category; each shop has
+// one menu-board sign. Three rows, all facing the camera (south), each reached from its south side:
+//   back  row (j=2) "Grow":   seeds, plant care, farm gadgets
+//   middle row (j=4) "Gear":  garden tools, outfitter (gnome upgrades)
+//   front row (j=6) "Defend": pest control, defenses (reached from the garden)
+// The aisles are j=3 and j=5. The Quick Sell kiosk sits in the middle of the front two rows.
+export const MARKET = { j0: 2, j1: 6, kiosk: { i0: 14, i1: 15, j0: 5, j1: 6 }, plaza: { i0: 13, i1: 16, j: 7 } };
+const cx = (i) => i * CELL - HALF + CELL / 2;
+export const COUNTER = { x: 0, z: cx(MARKET.plaza.j) - 0.4 }; // where you stand to quick sell
+
+// A stall entry is [kind, key] or, for an upgrade path, ['upgrade', [key, key, ...]] (one stall
+// that sells the next level).
+export const SHOPS = [
+  { id: 'crops', name: 'Crop Seeds', icon: '🌱', color: 0x43a047, css: '#7cc554', row: 2, at: 3,
+    items: [['seed', 'daisy'], ['seed', 'strawberry'], ['seed', 'carrot'], ['seed', 'tomato'], ['seed', 'corn'], ['seed', 'watermelon'], ['seed', 'pumpkin']] },
+  { id: 'helpers', name: 'Helper Seeds', icon: '🏵️', color: 0x00897b, css: '#4dd0b8', row: 2, at: 11,
+    items: [['seed', 'marigold'], ['seed', 'sunflower'], ['seed', 'flytrap'], ['seed', 'rose']] },
+  { id: 'care', name: 'Plant Care', icon: '🧪', color: 0x8e5bb5, css: '#c39be0', row: 2, at: 16,
+    items: [['supply', 'soil'], ['supply', 'fertilizer'], ['supply', 'sunjar'], ['upgrade', 'mulch']] },
+  { id: 'farm', name: 'Farm Gadgets', icon: '⛲', color: 0x2f86d6, css: '#74b9f0', row: 2, at: 21,
+    items: [['kit', 'barrel'], ['kit', 'compost'], ['kit', 'sprinkler'], ['kit', 'lamp'], ['kit', 'beehive'], ['kit', 'sellbox']] },
+  { id: 'tools', name: 'Garden Tools', icon: '🧰', color: 0xb5793a, css: '#e0a46a', row: 4, at: 5,
+    items: [['tool', 'shovel'], ['tool', 'can'], ['tool', 'hose'], ['upgrade', 'sharp'], ['upgrade', 'bigcan'], ['upgrade', 'soaphose']] },
+  { id: 'outfit', name: 'Outfitter', icon: '🎒', color: 0xe6a817, css: '#ffd54f', row: 4, at: 20,
+    items: [['upgrade', ['pockets', 'backpack', 'wheelbarrow']], ['upgrade', 'shoes'], ['upgrade', 'strongback'], ['upgrade', 'lanterns']] },
+  { id: 'pest', name: 'Pest Control', icon: '🎯', color: 0xd84336, css: '#ff8a7a', row: 6, at: 5,
+    items: [['tool', 'swatter'], ['tool', 'spray'], ['tool', 'slingshot'], ['tool', 'gun'], ['tool', 'mgun'], ['upgrade', 'potato']] },
+  { id: 'defense', name: 'Defenses', icon: '🛡️', color: 0x5c6bc0, css: '#9fa8f0', row: 6, at: 19,
+    items: [['kit', 'fence'], ['kit', 'beertrap'], ['kit', 'scarecrow'], ['kit', 'ladybugs'], ['kit', 'zapper']] },
 ];
+export const STALLS = SHOPS.flatMap((shop) => shop.items.map(([kind, key], n) => ({
+  shop: shop.id, kind, key: Array.isArray(key) ? key[0] : key, chain: Array.isArray(key) ? key : null, i: shop.at + n, j: shop.row,
+})));
 
 // ───────────────────────── Enemies ─────────────────────────
 export const ENEMIES = {
@@ -138,7 +166,7 @@ export function itemInfo(kind) {
     case 'junk': return { name: 'Old Junk', icon: '🥾', sell: 3 };
     case 'dew': return { name: 'Dew Drop', icon: '💧' };
     case 'coin': return { name: 'Coins', icon: '🪙' };
-    case 'seed': return { name: `${PLANTS[sub].name} Seeds`, icon: '🌱', sub: PLANTS[sub].icon };
+    case 'seed': return { name: `${PLANTS[sub].name} Seeds`, icon: PLANTS[sub].icon, sub: PLANTS[sub].icon };
     case 'produce': return { name: PLANTS[sub].name, icon: PLANTS[sub].icon, produce: true };
     case 'kit': return { name: PLACEABLES[sub].name, icon: PLACEABLES[sub].icon };
     case 'tool': return { name: TOOLS[sub].name, icon: TOOLS[sub].icon };

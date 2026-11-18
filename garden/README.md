@@ -11,6 +11,7 @@ See [GAME_DESIGN.md](GAME_DESIGN.md) for the full design.
 npm install
 npm run dev      # then open the printed URL (Chrome/Edge/Firefox)
 npm run build    # production build in dist/
+npm run balance  # print the plant economy and the market unlock/price curve
 npm run prod     # build + serve on 0.0.0.0:4173 for LAN play (prints the LAN links)
 PORT=8080 npm run prod   # use a different port
 ```
@@ -34,14 +35,15 @@ Press a button on each controller once after the page loads so the browser can s
 
 | File | Purpose |
 |---|---|
-| `src/config.js` | All tuning data: plants, tools, gadgets, supplies, upgrades, enemies |
+| `src/config.js` | All tuning data: plant economy formula, plants, tools, gadgets, supplies, upgrades, shops, enemies |
 | `src/game.js` | Game flow: day/night, joining/leaving, projectiles, camera, lights |
 | `src/players.js` | Gnome movement, context actions, tools, carrying |
 | `src/enemies.js` | Enemy AI and the wave Director |
 | `src/plants.js` | Plant growth model (water/sun/soil) and the Heart Bloom |
 | `src/placeables.js` | Garden gadgets (sprinkler, zapper, lamp, …) |
 | `src/world.js` | Grid, plots, weeds, ground pickups |
-| `src/market.js` | The walk-in market: one stall per item (buy with A, sell back with X), Quick Sell counter |
+| `src/market.js` | The walk-in market: shops with menu boards, one stall per item (buy with A, sell back with X), NEW tags, Quick Sell kiosk |
+| `src/icons.js` | Item icons rendered from the 3D models at startup (used on boards, cards and the HUD) |
 | `src/hud.js` | HUD, stall cards, attack alarms, title and results screens |
 | `src/models.js`, `src/scene.js` | Procedural low-poly models and scene setup |
 | `src/input.js`, `src/audio.js`, `src/fx.js` | Gamepad/keyboard input, synthesized SFX, particles |

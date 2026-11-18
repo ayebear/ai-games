@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLANTS, SOIL, HEART_R } from './config.js';
+import { PLANTS, SOIL, HEART_R, REGROW_AT } from './config.js';
 import { G, clamp, dist2, rand } from './state.js';
 import { makePlantModel, makeHeart, P, SPH, mat } from './models.js';
 import { sfx } from './audio.js';
@@ -176,8 +176,10 @@ export class Plant {
     this.cell.soil = Math.max(0, this.cell.soil - 1);
     G.world.refreshPlot(this.cell);
     if (d.regrow) {
-      this.growth = 0.72;
-      this.stage = 3;
+      // back to the Growing stage; each new crop starts at normal size
+      this.growth = REGROW_AT;
+      this.stage = stageOf(REGROW_AT);
+      this.size = 1;
       this.rebuild();
     } else {
       this.remove();
