@@ -218,10 +218,9 @@ export class Player {
 
   tryMove(dx, dz) {
     const w = G.world;
-    const closed = G.phase === 'night'; // market aisles are roped off at night
-    const free = !w.walkable(this.pos.x, this.pos.z, 0.4, closed);
-    if (free || w.walkable(this.pos.x + dx, this.pos.z, 0.4, closed)) this.pos.x += dx;
-    if (free || w.walkable(this.pos.x, this.pos.z + dz, 0.4, closed)) this.pos.z += dz;
+    const free = !w.walkable(this.pos.x, this.pos.z, 0.4);
+    if (free || w.walkable(this.pos.x + dx, this.pos.z, 0.4)) this.pos.x += dx;
+    if (free || w.walkable(this.pos.x, this.pos.z + dz, 0.4)) this.pos.z += dz;
     const lim = HALF - 4.4;
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.z = clamp(this.pos.z, -lim, lim);

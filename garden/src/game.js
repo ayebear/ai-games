@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS, MARKET, COUNTER } from './config.js';
+import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
 import { G, newStats, activePlayers, attackedThings, rand, pick, clamp, dist2 } from './state.js';
 import { World, spawnPickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
@@ -187,7 +187,6 @@ export class Game {
     G.phase = 'night';
     G.time = 0;
     sfx('dusk');
-    this.evictMarket();
     for (const e of G.enemies) if (!e.def.night) e.startFlee();
     const counts = G.director.onDusk();
     const list = Object.entries(counts).map(([k, n]) => `${ENEMIES[k].icon}×${n}`).join(' ');
@@ -234,22 +233,6 @@ export class Game {
     this.endT = 0;
     sfx('win');
     G.hud.showEnd(true);
-  }
-
-  // At dusk the market closes: anyone still browsing gets poofed out to the front entrance.
-  evictMarket() {
-    let k = 0;
-    for (const p of activePlayers()) {
-      const c = G.world.cellAt(p.pos.x, p.pos.z);
-      if (!c || c.j > MARKET.j1) continue;
-      G.fx.burst({ x: p.pos.x, y: 1, z: p.pos.z }, 0xffffff, 14, { speed: 3 });
-      p.pos.set(COUNTER.x + (k % 2 ? 1.5 : -1.5) * (1 + Math.floor(k / 2)), 0, MARKET.front + 1.2);
-      p.kv.set(0, 0, 0);
-      G.fx.burst({ x: p.pos.x, y: 1, z: p.pos.z }, 0xfff59d, 14, { speed: 3, emissive: true });
-      G.fx.text(p.pos, 'Market closed!', '#ffe082', 15);
-      k++;
-    }
-    if (k) sfx('pickup');
   }
 
   // ───────────── Projectiles ─────────────

@@ -30,12 +30,10 @@ export class World {
   cellAt(x, z) { return this.cell(Math.floor((x + HALF) / CELL), Math.floor((z + HALF) / CELL)); }
 
   // Can a gnome stand at x,z (with radius r)?
-  // `marketClosed`: at night the market aisles are roped off (the quick-sell plaza stays open).
-  walkable(x, z, r = 0.4, marketClosed = false) {
+  walkable(x, z, r = 0.4) {
     for (const [dx, dz] of [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]]) {
       const c = this.cellAt(x + dx, z + dz);
       if (!c || c.type === 'forest' || c.type === 'solid' || c.type === 'water') return false;
-      if (marketClosed && c.type === 'market') return false;
       if (c.placeable && c.placeable.def.blocks) return false;
     }
     if (Math.hypot(x, z) < HEART_R - 0.2) return false;

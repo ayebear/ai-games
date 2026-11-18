@@ -134,8 +134,8 @@ unlocked yet, SOLD for owned upgrades). Walk up to a stall and a card shows what
 - **Quick Sell counter** (the Trading Post) at the front center buys *anything*, so you never have to go
   inside just to dump weeds and junk. It also holds the coin jar raccoons are after.
 - **Sell Stand** gadget ($150): your own quick-sell spot anywhere in the garden.
-- **At dusk the market closes**: anyone inside is moved to the front entrance and the aisles are roped
-  off until dawn (the Quick Sell counter stays open).
+- **At dusk the market closes**: you can still walk the aisles, but every stall shows CLOSED and
+  won't sell until dawn (the Quick Sell counter stays open).
 
 ## 4c. Camera
 
