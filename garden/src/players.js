@@ -43,15 +43,17 @@ export class Player {
     for (const [x, z, sx, sz] of [[0, -0.92, 1.9, 0.1], [0, 0.92, 1.9, 0.1], [-0.92, 0, 0.1, 1.9], [0.92, 0, 0.1, 1.9]]) P(this.retSq, BOX(), rm, [x, 0, z], [sx, 0.04, sz], [0, 0, 0], false);
     this.retRing = new THREE.Mesh(RING(), mat(this.color, { emissive: this.color, emissiveIntensity: 1.2, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }));
     this.retRing.rotation.x = -Math.PI / 2;
-    // shop items: a ring with a $ inside
+    // shop items: a ring around the item's base with a $ badge on its right side, colored by what
+    // you can do there (see SHOP_TARGET)
     this.retShop = new THREE.Group();
-    const shopRing = new THREE.Mesh(RING(), this.retRing.material);
+    this.shopRingMat = new THREE.MeshBasicMaterial({ color: SHOP_TARGET.buy.color, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false });
+    const shopRing = new THREE.Mesh(RING(), this.shopRingMat);
     shopRing.rotation.x = -Math.PI / 2;
-    shopRing.scale.setScalar(0.95);
-    const dollar = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: dollarTex(this.color), transparent: true, depthWrite: false, toneMapped: false }));
-    dollar.rotation.x = -Math.PI / 2;
-    dollar.position.y = 0.01;
-    this.retShop.add(shopRing, dollar);
+    shopRing.scale.setScalar(1.05);
+    this.shopBadge = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: dollarTex('buy'), transparent: true, depthWrite: false, toneMapped: false }));
+    this.shopBadge.rotation.x = -Math.PI / 2;
+    this.shopBadge.position.set(1.12, 0.02, 0.45); // right side, toward the camera: not hidden by a gnome standing in front
+    this.retShop.add(shopRing, this.shopBadge);
     G.scene.add(this.retSq, this.retRing, this.retShop);
     this.retSq.visible = this.retRing.visible = this.retShop.visible = false;
   }
@@ -80,7 +82,17 @@ export class Player {
     if (at.kind === 'plant') r = 0.8; else if (shape === 'ring' && !at.kind && this.ctx?.r == null) r = Math.min(r, 0.55);
     const pulse = 1 + Math.sin(this.t * 6) * 0.06;
     if (shape === 'sq') { this.retSq.position.set(pos.x, 0.17, pos.z); this.retSq.scale.setScalar(pulse); }
-    else if (shape === 'shop') { this.retShop.position.set(pos.x, 0.06, pos.z); this.retShop.scale.setScalar(pulse); }
+    else if (shape === 'shop') {
+      // green = A buys it, gold = X sells yours back here, grey = neither right now
+      const mode = this.sellAct ? 'sell' : G.market.status(this, this.ctx.stall).ok ? 'buy' : 'none';
+      if (this.shopMode !== mode) {
+        this.shopMode = mode;
+        this.shopRingMat.color.setHex(SHOP_TARGET[mode].color);
+        this.shopBadge.material.map = dollarTex(mode);
+      }
+      this.retShop.position.set(pos.x, 0.06, pos.z);
+      this.retShop.scale.setScalar(pulse);
+    }
     else { this.retRing.position.set(pos.x, 0.18, pos.z); this.retRing.scale.setScalar(r * pulse); }
   }
 
@@ -795,21 +807,30 @@ export class Player {
   }
 }
 
-// A "$" drawn in a player's color, for the shop-item target marker.
+// Shop target colors: what A / X do at the item you're standing at. The card's Buy / Sell lines
+// use the same colors (style.css .stall .sa).
+const SHOP_TARGET = {
+  buy: { color: 0x43d36b, css: '#43d36b', text: '$' },
+  sell: { color: 0xffb300, css: '#ffb300', text: '+$' },
+  none: { color: 0x9e9e9e, css: '#9e9e9e', text: '$' },
+};
+// The shop target's badge: a disc in the mode's color with a white $ (or +$ when selling).
 const dollarTexs = new Map();
-function dollarTex(color) {
-  if (dollarTexs.has(color)) return dollarTexs.get(color);
+function dollarTex(mode) {
+  if (dollarTexs.has(mode)) return dollarTexs.get(mode);
+  const T = SHOP_TARGET[mode];
   const cv = document.createElement('canvas');
   cv.width = cv.height = 128;
   const x = cv.getContext('2d');
-  x.font = 'bold 104px "Trebuchet MS", sans-serif';
+  x.fillStyle = T.css;
+  x.beginPath(); x.arc(64, 64, 58, 0, Math.PI * 2); x.fill();
+  x.lineWidth = 8; x.strokeStyle = '#fff'; x.stroke();
+  x.font = `bold ${T.text.length > 1 ? 66 : 84}px "Trebuchet MS", sans-serif`;
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.lineWidth = 10; x.strokeStyle = 'rgba(0,0,0,0.55)';
-  x.strokeText('$', 64, 70);
-  x.fillStyle = '#' + new THREE.Color(color).getHexString();
-  x.fillText('$', 64, 70);
+  x.fillStyle = '#fff';
+  x.fillText(T.text, 64, 68);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
-  dollarTexs.set(color, t);
+  dollarTexs.set(mode, t);
   return t;
 }

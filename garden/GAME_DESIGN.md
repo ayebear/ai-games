@@ -156,7 +156,7 @@ Pumpkin ~$330 (a ×3.5 Giant Pumpkin sells for $3,150).
 
 There are no shop menus. The north strip of the garden is a **market shaped like one big
 flower**. The 💰 Quick Sell kiosk is its center, and each of the five shops is a **petal** fanning
-out from it. Every item simply **floats in the air** over a soft spot of its shop's color, spinning
+out from it. Every item **hovers just above the floor** over a soft spot of its shop's color, spinning
 slowly, with a **price tag** above it showing its icon and price (`🍓 $6`). Nothing blocks: gnomes
 walk freely between the items, and **the item you stand at (or face) is the one you're
 browsing**; it gets a ring-and-**$** target marker. A card then shows what it does, what A and X do,
@@ -210,7 +210,10 @@ name near its tip.
 
 - **Target markers** (on the ground, in your color) show what A / X will act on: a **square** for
   a whole cell (tilling, planting, soil, placing a gadget, a fence), a **ring** for round things
-  (plants, weeds, gadgets, pickups, sized to the thing), and a **ring with a $** for a shop item.
+  (plants, weeds, gadgets, pickups, sized to the thing), and for a shop item a **ring around the
+  item's base with a $ badge**, colored by what you can do there: **green = A buys it**, **gold
+  (+$) = X sells yours back**, **grey = neither right now** (closed, can't afford, not arrived).
+  The Buy / Sell lines on the item's card use the same green and gold.
 
 - **Icons** for tools, gadgets and supplies are rendered from the item's own 3D model with a white
   sticker outline, so the icon on the board, the card, your HUD and the item in the world all

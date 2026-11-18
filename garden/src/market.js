@@ -20,9 +20,9 @@ const carryKind = (it) => (it.kind === 'seed' ? 'seed:' + it.key : it.kind === '
 // Carried kinds a stall buys back: a seed stall also buys that plant's produce.
 const buysBack = (it) => (it.kind === 'seed' ? ['produce:' + it.key, 'seed:' + it.key] : it.kind === 'kit' || it.kind === 'supply' ? [carryKind(it)] : []);
 
-const ITEM_Y = 0.75; // items float this high
+const ITEM_Y = 0.22; // items hover just above the floor, right inside their target ring
 const ITEM_SCALE = 1.5;
-const TAG_Y = 2.75; // price tag
+const TAG_Y = 2.3; // price tag
 const TAG_PX = { w: 300, h: 112 };
 const LOCKED_ALPHA = 0.2; // items that haven't arrived yet
 const SIGN_PX = { w: 640, h: 128 };
@@ -70,7 +70,7 @@ export class Market {
     const g = new THREE.Group();
     g.position.set(s.x, 0, s.z);
     const shadowMat = new THREE.MeshBasicMaterial({ color: shop.color, transparent: true, opacity: 0.3, depthWrite: false });
-    P(g, CYL(20), shadowMat, [0, 0.04, 0], [0.7, 0.01, 0.7], [0, 0, 0], false);
+    P(g, CYL(20), shadowMat, [0, 0.04, 0], [0.85, 0.01, 0.85], [0, 0, 0], false);
     const spin = new THREE.Group();
     spin.position.y = ITEM_Y;
     const model = displayFor(s.kind, s.key);
