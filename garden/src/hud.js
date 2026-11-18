@@ -108,6 +108,9 @@ export class HUD {
   }
 
   updateWorldLabels(playing) {
+    // daylight 0..1 drives ring contrast (dark backing plates by day, airy at night)
+    const day = Math.round((1 - (G.night ?? 0)) * 20) / 20;
+    if (day !== this._day) { this._day = day; this.labels.style.setProperty('--day', day); }
     const shown = new Set();
     for (let i = 0; i < 4; i++) {
       const p = G.slots[i];

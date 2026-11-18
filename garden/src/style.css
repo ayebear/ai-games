@@ -107,10 +107,14 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .prompt .hold i { display: block; height: 100%; background: #7dff8a; border-radius: 3px; }
 /* Plant readout: no background at all, just ringed icons floating over the plant */
 .pcard { display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
-.pcard .rings { display: flex; gap: 8px; }
-.ring { position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.pcard .rings { display: grid; grid-template-columns: repeat(2, auto); gap: 10px 8px; }
+/* --day (0 night .. 1 noon, set from hud.js) fades in a dark backing plate + darker track for contrast on bright grass */
+#labels { --day: 1; }
+.ring { position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  background: rgba(10, 14, 10, calc(var(--day) * 0.75));
+  box-shadow: 0 0 0 2px rgba(10, 14, 10, calc(var(--day) * 0.75)), 0 1px 4px rgba(0, 0, 0, calc(var(--day) * 0.6)); }
 .ring::before { content: ''; position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(var(--c) calc(var(--p) * 360deg), rgba(0, 0, 0, 0.35) 0);
+  background: conic-gradient(var(--c) calc(var(--p) * 360deg), color-mix(in srgb, rgba(255, 255, 255, 0.16) calc(var(--day) * 100%), rgba(0, 0, 0, 0.35)) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8)); }
