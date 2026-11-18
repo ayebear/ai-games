@@ -15,6 +15,9 @@ export function sunAt(x, z) {
 
 export const PLANT_SCALE = 1.55;
 const stageOf = (g) => (g < 0.12 ? 0 : g < 0.32 ? 1 : g < 0.62 ? 2 : g < 1 ? 3 : 4);
+// A plant with no water loses HP so that it dies this many seconds after drying out (from full HP),
+// whatever its size. A flat rate made cheap starter crops die in about 20 s.
+const DRY_DEATH = 90;
 export const STAGE_NAMES = ['Seed', 'Sprout', 'Growing', 'Budding', 'Bloom'];
 
 export class Plant {
@@ -56,6 +59,8 @@ export class Plant {
   addWater(a) {
     this.water = clamp(this.water + a, 0, 1.25);
   }
+  // none (dried out: hurts the plant) · low (grows at half speed) · ok · soggy (overwatered: slow)
+  get waterState() { const w = this.water; return w < 0.1 ? 'none' : w < 0.3 ? 'low' : w <= 0.9 ? 'ok' : 'soggy'; }
 
   update(dt) {
     const d = this.def;
@@ -74,8 +79,7 @@ export class Plant {
     if (d.thirsty) drain *= d.thirsty;
     if (G.weather === 'rain') this.water += 0.012 * dt;
     this.water = clamp(this.water - drain * dt, 0, 1.25);
-    const w = this.water;
-    const wf = w < 0.1 ? 0 : w < 0.3 ? 0.5 : w <= 0.9 ? 1 : 0.45;
+    const wf = { none: 0, low: 0.5, ok: 1, soggy: 0.45 }[this.waterState];
     this.waterF = wf;
     const sf = d.sunNeed ? Math.pow(sun, d.sunNeed) * 1.5 : sun;
     const rate = wf * sf * SOIL[this.cell.soil].mult * (this.hive ? 1.25 : 1) * (this.mites > 5 ? 0.6 : 1);
@@ -83,7 +87,7 @@ export class Plant {
     else if (this.size < d.maxSize) this.size = Math.min(d.maxSize, this.size + (dt * rate * (d.maxSize - 1)) / (d.grow * 1.6));
 
     if (wf === 0) {
-      this.hp -= dt * 0.8;
+      this.hp -= (dt * this.maxHp) / DRY_DEATH; // any plant lasts DRY_DEATH s from full HP once dry
       if (this.stage === 4) this.size = Math.max(1, this.size - dt * 0.01);
     } else if (wf === 1 && this.mites < 1) this.hp = Math.min(this.maxHp, this.hp + dt * 0.7);
 
@@ -203,6 +207,8 @@ export class Plant {
   }
 }
 
+const HEART_THIRST = 2; // HP per second the Heart Bloom loses while it has no water
+
 export class Heart {
   constructor() {
     this.model = makeHeart();
@@ -214,13 +220,19 @@ export class Heart {
     this.hp = 400; this.water = 0.6;
     this.dead = false; this.bite = 0; this.t = 0; this.hurtT = 0;
   }
-  get maxHp() { return 400 + (G.upgrades.has('mulch') ? 150 : 0); }
+  get maxHp() { return 400; }
   addWater(a) { this.water = clamp(this.water + a, 0, 1.2); }
+  // none (bone dry: the Heart loses HP) · low (stops healing) · ok. The Heart can't be overwatered.
+  get waterState() { return this.water <= 0.01 ? 'none' : this.water < 0.15 ? 'low' : 'ok'; }
 
   update(dt) {
     this.t += dt;
     this.water = clamp(this.water - dt * 0.004 * (G.weather === 'heat' ? 2 : 1) + (G.weather === 'rain' ? 0.01 * dt : 0), 0, 1.2);
-    if (G.phase === 'day' && this.water > 0.15 && this.hp > 0) this.hp = Math.min(this.maxHp, this.hp + dt * (G.upgrades.has('mulch') ? 2.5 : 1.2));
+    const ws = this.waterState;
+    if (ws === 'none' && this.hp > 0) {
+      this.hp -= dt * HEART_THIRST;
+      if (this.hp <= 0) { this.hp = 0; this.dead = true; }
+    } else if (G.phase === 'day' && ws === 'ok' && this.hp > 0) this.hp = Math.min(this.maxHp, this.hp + dt * 1.2);
     this.hurtT = Math.max(0, this.hurtT - dt);
     const m = this.model;
     const ratio = this.hp / this.maxHp;

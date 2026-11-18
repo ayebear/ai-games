@@ -10,7 +10,6 @@ export function lightAt(x, z) {
   if (G.phase !== 'night') return null;
   for (const p of G.placeables) if (p.type === 'lamp' && !p.dead && Math.hypot(p.pos.x - x, p.pos.z - z) < p.def.radius) return p.pos;
   for (const f of G.flashes) if (Math.hypot(f.x - x, f.z - z) < f.r) return f;
-  if (G.upgrades.has('lanterns')) for (const pl of activePlayers()) if (Math.hypot(pl.pos.x - x, pl.pos.z - z) < 4.2) return pl.pos;
   return null;
 }
 

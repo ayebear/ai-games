@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
-import { G, newStats, activePlayers, attackedThings, rand, pick, clamp, dist2 } from './state.js';
+import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, DEFS, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
+import { G, newStats, activePlayers, attentionThings, rand, pick, clamp, dist2 } from './state.js';
 import { World, spawnPickup, removePickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
 import { Player } from './players.js';
@@ -41,7 +41,7 @@ export class Game {
     G.plants = []; G.enemies = []; G.pickups = []; G.placeables = []; G.projectiles = []; G.flashes = [];
     G.heart = new Heart();
     G.money = 0; G.day = 1; G.time = 0; G.phase = 'day';
-    G.upgrades = new Set(); G.seen = new Set(); G.stats = newStats();
+    G.seen = new Set(); G.stats = newStats();
     G.weather = 'clear'; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
     G.jar.attackedAt = -99;
     G.director.reset();
@@ -217,7 +217,7 @@ export class Game {
     G.director.onDawn();
     sfx('dawn');
     const wtxt = { clear: 'Clear skies', rain: '🌧️ Rain: plants drink, half sun, no dew', heat: '🔥 Heatwave: water evaporates 2× faster' }[G.weather];
-    const fresh = Object.entries({ seed: PLANTS, tool: TOOLS, kit: PLACEABLES, supply: SUPPLIES, upgrade: UPGRADES })
+    const fresh = Object.entries(DEFS)
       .flatMap(([kind, defs]) => Object.entries(defs).filter(([, d]) => d.unlock === G.day).map(([key, d]) => `${iconHTML(stallIconId(kind, key))} ${d.name}`));
     G.fx.toast(`☀️ Day ${G.day} — Night ${G.day - 1} survived!`, `${wtxt} · Hot item: ${PLANTS[G.hotItem].icon} ${PLANTS[G.hotItem].name} sells ×2${fresh.length ? '<br>New at the market: ' + fresh.join(', ') : ''}`);
     if (G.day % 10 === 0) setTimeout(() => G.fx.toast('⚠️ Tonight is a full moon…', 'Something big is coming. Prepare!', 'danger'), 2500);
@@ -308,13 +308,13 @@ export class Game {
       this.camT.set(0, 0, 0);
       return;
     }
-    // Frame every gnome plus anything of yours that's under attack, so you always see the threat.
+    // Frame every gnome plus anything of yours that needs help (under attack, dry, mites, dying).
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     const add = (x, z, pad) => { x0 = Math.min(x0, x - pad); x1 = Math.max(x1, x + pad); z0 = Math.min(z0, z - pad); z1 = Math.max(z1, z + pad); };
     if (G.state === 'gameover') add(0, 0, 6);
     else {
       for (const p of ps) add(p.pos.x, p.pos.z, 2.5);
-      if (G.state === 'playing' || G.state === 'paused') for (const t of attackedThings()) add(t.pos.x, t.pos.z, (t.radius ?? 1) + 2.5);
+      if (G.state === 'playing' || G.state === 'paused') for (const t of attentionThings()) add(t.pos.x, t.pos.z, (t.radius ?? 1) + 2.5);
     }
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     // distance needed to fit the box: width against the horizontal FOV, depth against the tilted vertical FOV
@@ -345,13 +345,12 @@ export class Game {
       if (lp) { l.position.set(lp.pos.x, 2.4, lp.pos.z); l.intensity = 2 + nk * 28; }
       else { l.intensity = 0; l.position.y = -50; }
     });
-    const bright = G.upgrades.has('lanterns');
     playerLights.forEach((l, i) => {
       const p = G.slots[i];
       if (p && p.active && nk > 0.05) {
         l.position.set(p.pos.x, 1.6, p.pos.z);
-        l.intensity = nk * (bright ? 30 : 16);
-        l.distance = bright ? 14 : 9;
+        l.intensity = nk * 16;
+        l.distance = 9;
       } else { l.intensity = 0; l.position.y = -50; }
     });
     heartLight.intensity = nk * 18;

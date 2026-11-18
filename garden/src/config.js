@@ -59,20 +59,37 @@ for (const d of Object.values(PLANT_DEFS)) d.value = plantValue(d);
 export const PLANTS = PLANT_DEFS;
 
 // ───────────────────────── Tools (per player) ─────────────────────────
-// Garden tools grow things; pest control (weapon: true) fights things.
+// Garden tools grow things; pest control (weapon: true) fights things. A better version of a tool
+// names its `base`: it works like the base tool but stronger, and buying it trades in the one you
+// have (half price back). A gnome only ever holds one tool of each base.
 export const TOOLS = {
   hands: { name: 'Hands', icon: '✋', cost: 0, unlock: 1, desc: 'Pull weeds, carry, harvest. Weak punch.' },
   shovel: { name: 'Shovel', icon: '⛏️', cost: 10, unlock: 1, desc: 'Till plots, dig weeds, bonk pests and moles.' },
   can: { name: 'Watering Can', icon: '🚿', cost: 12, unlock: 1, desc: 'Fill at the pond or a barrel. Hold to water.' },
+  steelshovel: { name: 'Steel Shovel', icon: '🗡️', base: 'shovel', cost: 45, unlock: 4, model: { sharp: true }, desc: 'A Shovel that hits 2× harder and swings faster.' },
+  goldcan: { name: 'Golden Can', icon: '🏆', base: 'can', cost: 50, unlock: 4, model: { gold: true }, desc: 'A Watering Can that holds double and pours faster.' },
   hose: { name: 'Garden Hose', icon: '🌊', cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
+  soaphose: { name: 'Soap Hose', icon: '🧼', base: 'hose', cost: 160, unlock: 6, model: { soap: true }, desc: 'A Garden Hose whose spray also kills mites and burns slugs.' },
   swatter: { name: 'Fly Swatter', icon: '🏓', cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
   spray: { name: 'Soap Sprayer', icon: '🧴', cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
   slingshot: { name: 'Slingshot', icon: '🪃', cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
   gun: { name: 'Spud Gun', icon: '🥔', cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
   mgun: { name: 'Seed Blaster', icon: '🔫', cost: 350, unlock: 6, weapon: true, desc: 'Hold to spray seeds. Overheats: fire in bursts.' },
+  hotgun: { name: 'Hot Spud Gun', icon: '🔥', base: 'gun', cost: 150, unlock: 5, weapon: true, model: { hot: true }, desc: 'A Spud Gun with flaming spuds that hit harder and pierce.' },
 };
+export const toolBase = (key) => TOOLS[key]?.base ?? key;
 export const CAN_CAP = 3;
 export const SPRAY_CAP = 25;
+
+// ───────────────────────── Bags (per player, worn) ─────────────────────────
+// Every gnome starts with pockets that hold BASE_CAP. A bag replaces the one you wear (half price
+// back for the old one). Capacity is in weight units (see itemWeight).
+export const BASE_CAP = 5;
+export const BAGS = {
+  satchel: { name: 'Satchel', icon: '👜', cost: 15, unlock: 1, cap: 10, desc: 'Carry 10 instead of 5.' },
+  backpack: { name: 'Backpack', icon: '🎒', cost: 40, unlock: 3, cap: 16, desc: 'Carry 16.' },
+  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 200, unlock: 7, cap: 25, noSlow: true, desc: 'Carry 25, and a full load never slows you down.' },
+};
 
 // ───────────────────────── Gadgets (shared, placed on the grid) ─────────────────────────
 export const PLACEABLES = {
@@ -94,57 +111,40 @@ export const SUPPLIES = {
   soil: { name: 'Soil Bag', icon: '🟫', cost: 6, unlock: 1, desc: 'Upgrade a plot one soil level.' },
   fertilizer: { name: 'Fertilizer', icon: '🧪', cost: 10, unlock: 2, desc: 'Instant growth spurt for one plant.' },
   sunjar: { name: 'Sun Jar', icon: '☀️', cost: 20, unlock: 3, desc: 'Boost a plant, or throw it to stun pests.' },
+  mulch: { name: 'Heart Mulch', icon: '🌸', cost: 40, unlock: 5, desc: 'Heals the Heart Bloom 150 HP.' },
 };
+export const MULCH_HEAL = 150;
 
-// ───────────────────────── Upgrades (shared, one-time) ─────────────────────────
-export const UPGRADES = {
-  pockets: { name: 'Big Pockets', icon: '👖', cost: 20, unlock: 1, desc: 'Bag holds 10 (was 5).' },
-  backpack: { name: 'Backpack', icon: '🎒', cost: 80, unlock: 3, requires: 'pockets', desc: 'Bag holds 16.' },
-  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 300, unlock: 7, requires: 'backpack', desc: 'Bag holds 25.' },
-  shoes: { name: 'Running Shoes', icon: '👟', cost: 40, unlock: 2, desc: 'All gnomes run 25% faster.' },
-  strongback: { name: 'Strong Back', icon: '💪', cost: 60, unlock: 3, desc: 'No slowdown from a heavy bag.' },
-  lanterns: { name: 'Bright Lanterns', icon: '🏮', cost: 120, unlock: 5, desc: 'Wider lantern light. Scares deer.' },
-  bigcan: { name: 'Golden Can', icon: '🏆', cost: 70, unlock: 4, desc: 'Cans hold double and pour faster.' },
-  sharp: { name: 'Sharp Shovels', icon: '🗡️', cost: 60, unlock: 4, desc: 'Shovels hit 2× harder and swing faster.' },
-  soaphose: { name: 'Soap Mixer', icon: '🧼', cost: 120, unlock: 6, desc: 'Hose spray kills mites and burns slugs.' },
-  potato: { name: 'Hot Potatoes', icon: '🔥', cost: 250, unlock: 8, desc: 'Spud Gun hits harder and pierces.' },
-  mulch: { name: 'Heart Mulch', icon: '🌸', cost: 150, unlock: 5, desc: 'Heart Bloom +150 max HP, heals faster.' },
-};
+// Every buyable item, by stall kind.
+export const DEFS = { seed: PLANTS, supply: SUPPLIES, tool: TOOLS, bag: BAGS, kit: PLACEABLES };
 
 // ───────────────────────── Market (walk-in store) ─────────────────────────
-// Every item is sold at its own stall. Stalls are grouped into shops by category; each shop has
-// one menu-board sign. Three rows, all facing the camera (south), each reached from its south side:
-//   back  row (j=2) "Grow":   seeds, plant care, farm gadgets
-//   middle row (j=4) "Gear":  garden tools, outfitter (gnome upgrades)
-//   front row (j=6) "Defend": pest control, defenses (reached from the garden)
-// The aisles are j=3 and j=5. The Quick Sell kiosk sits in the middle of the front two rows.
+// Five shops, each selling one kind of thing. Every item has its own stall, and a shop's stalls
+// are always sorted cheapest-first by unlock day, then price, so better items sit further right.
+// Three rows, all facing the camera (south), each reached from its south side:
+//   front  row (j=6): Seeds, Plant Care       (reached from the garden; the Quick Sell kiosk between)
+//   middle row (j=4): Garden Gear, Pest Control  (per-gnome tools and bags)
+//   back   row (j=2): Gadgets                  (shared things you place in the garden)
+// The aisles are j=3 and j=5.
 export const MARKET = { j0: 2, j1: 6, kiosk: { i0: 14, i1: 15, j0: 5, j1: 6 }, plaza: { i0: 13, i1: 16, j: 7 } };
 const cx = (i) => i * CELL - HALF + CELL / 2;
 export const COUNTER = { x: 0, z: cx(MARKET.plaza.j) - 0.4 }; // where you stand to quick sell
 
-// A stall entry is [kind, key] or, for an upgrade path, ['upgrade', [key, key, ...]] (one stall
-// that sells the next level).
+// stock: which items the shop sells, as [kind, filter?] pairs.
 export const SHOPS = [
-  { id: 'crops', name: 'Crop Seeds', icon: '🌱', color: 0x43a047, css: '#7cc554', row: 2, at: 3,
-    items: [['seed', 'daisy'], ['seed', 'strawberry'], ['seed', 'carrot'], ['seed', 'tomato'], ['seed', 'corn'], ['seed', 'watermelon'], ['seed', 'pumpkin']] },
-  { id: 'helpers', name: 'Helper Seeds', icon: '🏵️', color: 0x00897b, css: '#4dd0b8', row: 2, at: 11,
-    items: [['seed', 'marigold'], ['seed', 'sunflower'], ['seed', 'flytrap'], ['seed', 'rose']] },
-  { id: 'care', name: 'Plant Care', icon: '🧪', color: 0x8e5bb5, css: '#c39be0', row: 2, at: 16,
-    items: [['supply', 'soil'], ['supply', 'fertilizer'], ['supply', 'sunjar'], ['upgrade', 'mulch']] },
-  { id: 'farm', name: 'Farm Gadgets', icon: '⛲', color: 0x2f86d6, css: '#74b9f0', row: 2, at: 21,
-    items: [['kit', 'barrel'], ['kit', 'compost'], ['kit', 'sprinkler'], ['kit', 'lamp'], ['kit', 'beehive'], ['kit', 'sellbox']] },
-  { id: 'tools', name: 'Garden Tools', icon: '🧰', color: 0xb5793a, css: '#e0a46a', row: 4, at: 5,
-    items: [['tool', 'shovel'], ['tool', 'can'], ['tool', 'hose'], ['upgrade', 'sharp'], ['upgrade', 'bigcan'], ['upgrade', 'soaphose']] },
-  { id: 'outfit', name: 'Outfitter', icon: '🎒', color: 0xe6a817, css: '#ffd54f', row: 4, at: 20,
-    items: [['upgrade', ['pockets', 'backpack', 'wheelbarrow']], ['upgrade', 'shoes'], ['upgrade', 'strongback'], ['upgrade', 'lanterns']] },
-  { id: 'pest', name: 'Pest Control', icon: '🎯', color: 0xd84336, css: '#ff8a7a', row: 6, at: 5,
-    items: [['tool', 'swatter'], ['tool', 'spray'], ['tool', 'slingshot'], ['tool', 'gun'], ['tool', 'mgun'], ['upgrade', 'potato']] },
-  { id: 'defense', name: 'Defenses', icon: '🛡️', color: 0x5c6bc0, css: '#9fa8f0', row: 6, at: 19,
-    items: [['kit', 'fence'], ['kit', 'beertrap'], ['kit', 'scarecrow'], ['kit', 'ladybugs'], ['kit', 'zapper']] },
+  { id: 'seeds', name: 'Seeds', icon: '🌱', color: 0x43a047, css: '#7cc554', row: 6, at: 2, stock: [['seed']] },
+  { id: 'care', name: 'Plant Care', icon: '🧪', color: 0x8e5bb5, css: '#c39be0', row: 6, at: 17, stock: [['supply']] },
+  { id: 'gear', name: 'Garden Gear', icon: '🧰', color: 0xb5793a, css: '#e0a46a', row: 4, at: 3, stock: [['tool', (d) => !d.weapon], ['bag']] },
+  { id: 'pest', name: 'Pest Control', icon: '🎯', color: 0xd84336, css: '#ff8a7a', row: 4, at: 18, stock: [['tool', (d) => d.weapon]] },
+  { id: 'gadgets', name: 'Gadgets', icon: '⛲', color: 0x2f86d6, css: '#74b9f0', row: 2, at: 9, stock: [['kit']] },
 ];
-export const STALLS = SHOPS.flatMap((shop) => shop.items.map(([kind, key], n) => ({
-  shop: shop.id, kind, key: Array.isArray(key) ? key[0] : key, chain: Array.isArray(key) ? key : null, i: shop.at + n, j: shop.row,
-})));
+for (const shop of SHOPS) {
+  shop.items = shop.stock
+    .flatMap(([kind, ok = () => true]) => Object.entries(DEFS[kind]).filter(([, d]) => d.cost > 0 && ok(d)).map(([key, d]) => ({ kind, key, d })))
+    .sort((a, b) => a.d.unlock - b.d.unlock || a.d.cost - b.d.cost)
+    .map(({ kind, key }) => [kind, key]);
+}
+export const STALLS = SHOPS.flatMap((shop) => shop.items.map(([kind, key], n) => ({ shop: shop.id, kind, key, i: shop.at + n, j: shop.row })));
 
 // ───────────────────────── Enemies ─────────────────────────
 export const ENEMIES = {
@@ -170,6 +170,7 @@ export function itemInfo(kind) {
     case 'produce': return { name: PLANTS[sub].name, icon: PLANTS[sub].icon, produce: true };
     case 'kit': return { name: PLACEABLES[sub].name, icon: PLACEABLES[sub].icon };
     case 'tool': return { name: TOOLS[sub].name, icon: TOOLS[sub].icon };
+    case 'bag': return { name: BAGS[sub].name, icon: BAGS[sub].icon };
     default: return SUPPLIES[k] ? { name: SUPPLIES[k].name, icon: SUPPLIES[k].icon } : { name: kind, icon: '?' };
   }
 }

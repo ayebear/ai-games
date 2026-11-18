@@ -16,7 +16,8 @@ export class World {
           const k = MARKET.kiosk;
           if (i >= k.i0 && i <= k.i1 && j >= k.j0 && j <= k.j1) type = 'solid'; // Quick Sell kiosk
           else type = 'market'; // walkable floor; no tilling, weeds or gadgets
-        } else if (i >= MARKET.plaza.i0 && i <= MARKET.plaza.i1 && j === MARKET.plaza.j) type = 'plaza'; // in front of the quick-sell counter else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
+        } else if (i >= MARKET.plaza.i0 && i <= MARKET.plaza.i1 && j === MARKET.plaza.j) type = 'plaza'; // in front of the quick-sell counter
+        else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
         else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'solid'; // heart bloom
         this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null });
       }

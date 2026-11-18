@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, PLAYER_CSS, PLAYER_NAMES, TOOLS, PLANTS, SOIL, ENEMIES, GOAL_DAYS, itemInfo, CAN_CAP, SPRAY_CAP } from './config.js';
+import { DAY_LEN, NIGHT_LEN, PLAYER_CSS, PLAYER_NAMES, TOOLS, BAGS, PLANTS, SOIL, ENEMIES, GOAL_DAYS, itemInfo, SPRAY_CAP } from './config.js';
 import { G, activePlayers, attackedThings } from './state.js';
 import { glyphsFor, padBtn, keyBtn } from './input.js';
 import { STAGE_NAMES } from './plants.js';
@@ -59,7 +59,7 @@ export class HUD {
         <div class="day ${night ? 'n' : ''}">${night ? '🌙 Night' : '☀️ Day'} <b>${G.day}</b><small>/${GOAL_DAYS}</small></div>
         <div class="clock"><div class="bar ${night ? 'n' : ''}"><i style="width:${prog * 100}%"></i></div><small>${night ? 'dawn' : 'dusk'} in ${fmtT(Math.max(0, left))}</small></div>
         <div class="money">💰 <b>$${Math.floor(G.money)}</b></div>
-        <div class="heart">🌸 Heart <div class="bar hb"><i style="width:${hr * 100}%;background:${hr > 0.5 ? '#ff6fa8' : hr > 0.25 ? '#ffa040' : '#ff3030'}"></i></div><small>${Math.ceil(h.hp)}/${h.maxHp} 💧${Math.round(h.water * 100)}%</small></div>
+        <div class="heart">🌸 Heart <div class="bar hb"><i style="width:${hr * 100}%;background:${hr > 0.5 ? '#ff6fa8' : hr > 0.25 ? '#ffa040' : '#ff3030'}"></i></div><small>${Math.ceil(h.hp)}/${h.maxHp} 💧${Math.round(h.water * 100)}%</small>${waterIcon(h.waterState)}</div>
         <div class="info">${weather} · Hot: ${PLANTS[G.hotItem].icon}×2 ${night || pests ? `· 🐛 ${pests}` : ''}</div>
         <div class="pausehint">${padBtn('start')}<small>/</small>${keyBtn('Esc')} pause</div>
       </div>${boss}`);
@@ -79,9 +79,9 @@ export class HUD {
     el.className = `panel p${i}`;
     const g = glyphsFor(p.device);
     const tools = p.tools.map((t, k) => `<span class="tool ${k === p.toolIdx ? 'on' : ''}" title="${TOOLS[t].name}">${t === 'hands' ? TOOLS.hands.icon : iconHTML('tool:' + t)}</span>`).join('');
-    const tool = p.tool;
+    const tool = p.tool, toolName = TOOLS[p.toolKey].name;
     let meter = '';
-    if (tool === 'can') meter = this.meter('💧', p.can / (CAN_CAP * (G.upgrades.has('bigcan') ? 2 : 1)), '#4fc3f7');
+    if (tool === 'can') meter = this.meter('💧', p.can / p.canCap, '#4fc3f7');
     if (tool === 'spray') meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
     if (tool === 'mgun') meter = this.meter(p.overheat ? '🔥' : '🌡️', p.heat || 0, p.overheat ? '#ff5252' : '#ffb74d');
     const c = p.carry;
@@ -89,18 +89,18 @@ export class HUD {
     const lr = p.loadRatio;
     const lcol = lr >= 1 ? '#ff5252' : lr >= 0.7 ? '#ffb74d' : '#9ccc65';
     const slow = p.loadSlow > 0.02 ? ` <span class="slow">−${Math.round(p.loadSlow * 100)}% speed</span>` : '';
-    const bagIcon = G.upgrades.has('wheelbarrow') ? '🛒' : G.upgrades.has('backpack') ? '🎒' : G.upgrades.has('pockets') ? '👖' : '👝';
+    const bagIcon = p.bag ? iconHTML('bag:' + p.bag) : '👖';
     const load = `<div class="load">${bagIcon}<div class="bar"><i style="width:${Math.min(1, lr) * 100}%;background:${lcol}"></i></div><b class="${lr >= 1 ? 'full' : ''}">${lr >= 1 ? 'FULL' : `${p.load}/${p.capacity}`}</b></div>${slow ? `<div class="slowrow">🏋️ Heavy load${slow}</div>` : ''}`;
     const keys = c
       ? `<div class="keys on">${g.b} drop &nbsp; ${g.y} throw</div>`
       : tool !== 'hands'
-        ? `<div class="keys">${p.bHold > 0.05 ? `<b class="drop">Dropping ${TOOLS[tool].name}…</b>` : `hold ${g.b} drop ${TOOLS[tool].name}`}</div>`
+        ? `<div class="keys">${p.bHold > 0.05 ? `<b class="drop">Dropping ${toolName}…</b>` : `hold ${g.b} drop ${toolName}`}</div>`
         : `<div class="keys off">${g.b} drop &nbsp; ${g.y} throw</div>`;
     const leaving = p.leaveT > 0.1 ? `<div class="leave">Leaving… ${Math.round((p.leaveT / 1) * 100)}%</div>` : '';
     setHTML(el, `
       <div class="pname"><span class="dot"></span>P${i + 1} ${PLAYER_NAMES[i]} <small>${p.device.startsWith('gp') ? '🎮' : '⌨️'}</small></div>
       <div class="tools">${g.lb}${tools}${g.rb}</div>
-      <div class="tname">${TOOLS[tool].name}</div>
+      <div class="tname">${toolName}</div>
       ${meter}${carry}${load}
       ${keys}${leaving}`);
   }
@@ -156,15 +156,22 @@ export class HUD {
       let el = this.badges.get(pl);
       if (shown.has(pl)) { if (el) el.style.display = 'none'; continue; }
       if (!el) { el = this.mk('badge'); this.badges.set(pl, el); }
+      // one danger alert (most urgent first), plus the water icon when water isn't healthy
       let alert = '';
       if (G.clock - (pl.attackedAt ?? -99) < 1.5) alert = '⚔️';
       else if (pl.mites >= 1) alert = '🐛';
       else if (pl.hp < pl.maxHp * 0.4) alert = '💔';
-      else if (pl.water < 0.15) alert = '💧';
-      else if (pl.water > 1.0) alert = '🌊';
       const main = pl.bloomed ? ring(pl.def.icon, 1, '#ffd54f', 'ready') : ring(pl.def.icon, pl.growth, '#9ccc65');
-      setHTML(el, `<div class="mini">${main}${alert ? `<div class="alert"><span>${alert}</span></div>` : ''}</div>`);
+      setHTML(el, `<div class="mini">${main}${alert ? `<div class="alert"><span>${alert}</span></div>` : ''}${waterIcon(pl.waterState)}</div>`);
       this.project(pl.pos, pl.topY + 0.5, el);
+    }
+    // water icon over the Heart Bloom when it's thirsty
+    const hs = playing && !G.heart.dead ? G.heart.waterState : 'ok';
+    if (!this.heartWater) this.heartWater = this.mk('badge');
+    if (hs === 'ok') this.heartWater.style.display = 'none';
+    else {
+      setHTML(this.heartWater, `<div class="mini">${waterIcon(hs, true)}</div>`);
+      this.project(G.heart.pos, 4.6, this.heartWater);
     }
     // alarm markers over attacked non-plant things
     const hot = new Set(G.state === 'playing' ? attackedThings().filter((t) => t.kind !== 'plant') : []);
@@ -191,7 +198,7 @@ export class HUD {
     const warn = [
       pl.mites >= 1 ? `🐛${Math.ceil(pl.mites)}` : '',
       pl.cell.weed ? '🌿' : '',
-      w < 0.1 ? '<b>dry</b>' : w > 0.9 ? '<b>soggy</b>' : '',
+      { none: '<b>no water</b>', low: 'low water', soggy: '<b>soggy</b>' }[pl.waterState] ?? '',
     ].filter(Boolean).join(' ');
     const perks = [pl.hive ? '🐝' : '', pl.marigoldNear ? '🏵️' : '', pl.ladybugs ? '🐞' : ''].join('');
     return `<div class="rings">${grow}${ring('💧', w / 1.25, wcol, 'water', '', WATER_TICKS)}${ring('☀️', pl.sunNow, '#ffd54f')}${ring('❤️', hp, hp < 0.4 ? '#ff5252' : '#ef5350')}</div>
@@ -304,4 +311,12 @@ function assignTitles(players) {
     out.set(p, best);
   }
   return out;
+}
+
+// Water status icon: nothing when healthy; soggy (overwatered), low, or none (a crossed-out drop).
+// Same look on plant badges, the Heart Bloom and the top bar.
+export function waterIcon(state, big = false) {
+  if (state === 'ok') return '';
+  const glyph = state === 'soggy' ? '🌊' : '💧';
+  return `<div class="wico ${state}${big ? ' big' : ''}" title="${{ soggy: 'Soggy', low: 'Low water', none: 'No water' }[state]}"><span>${glyph}</span></div>`;
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  PLANTS, PLACEABLES, TOOLS, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, SOIL, HALF, HEART_R,
-  itemInfo, isSellable, sellEach, itemWeight,
+  PLANTS, PLACEABLES, TOOLS, BAGS, BASE_CAP, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, SOIL, HALF, HEART_R,
+  MULCH_HEAL, itemInfo, isSellable, sellEach, itemWeight, toolBase,
 } from './config.js';
 import { G, clamp, dist2, rand, activePlayers } from './state.js';
 import { makeGnome, makeTool, makeItem, CYL, BOX, RING, mat, P } from './models.js';
@@ -26,6 +26,7 @@ export class Player {
     this.facing = 0;
     this.tools = ['hands'];
     this.toolIdx = 0;
+    this.bag = null; // worn bag (BAGS key), null = just pockets
     this.carry = null;
     this.can = 0; this.spray = 0;
     this.swingT = 0; this.cool = 0; this.holdT = 0; this.holdTarget = null; this.holdMax = 1;
@@ -68,16 +69,16 @@ export class Player {
 
   get dir() { return { x: Math.sin(this.facing), z: Math.cos(this.facing) }; }
   front(d = 1.3) { return { x: this.pos.x + Math.sin(this.facing) * d, z: this.pos.z + Math.cos(this.facing) * d }; }
-  // Bag capacity (in weight units) grows with the pockets → backpack → wheelbarrow upgrades.
-  get capacity() {
-    const u = G.upgrades;
-    return u.has('wheelbarrow') ? 25 : u.has('backpack') ? 16 : u.has('pockets') ? 10 : 5;
-  }
+  // Bag capacity (in weight units): pockets, or the bag this gnome wears.
+  get capacity() { return this.bag ? BAGS[this.bag].cap : BASE_CAP; }
   get load() { return this.carry ? this.carry.count * itemWeight(this.carry.kind) : 0; }
   get loadRatio() { return this.load / this.capacity; }
-  // A heavy bag slows you down (up to -30% when full) unless you have a Strong Back.
-  get loadSlow() { return G.upgrades.has('strongback') ? 0 : 0.3 * Math.pow(this.loadRatio, 1.5); }
-  get tool() { return this.tools[this.toolIdx]; }
+  // A heavy bag slows you down (up to -30% when full), except a wheelbarrow.
+  get loadSlow() { return this.bag && BAGS[this.bag].noSlow ? 0 : 0.3 * Math.pow(this.loadRatio, 1.5); }
+  // The equipped tool's key (e.g. 'steelshovel'), and what it works as (e.g. 'shovel').
+  get toolKey() { return this.tools[this.toolIdx]; }
+  get tool() { return toolBase(this.toolKey); }
+  get canCap() { return CAN_CAP * (this.tools.includes('goldcan') ? 2 : 1); }
 
   say(text, color = '#fff') {
     if (this.msgT > 0) return;
@@ -120,7 +121,7 @@ export class Player {
   }
 
   dropTool() {
-    const t = this.tool;
+    const t = this.toolKey;
     if (t === 'hands') return;
     this.tools.splice(this.toolIdx, 1);
     this.toolIdx = Math.min(this.toolIdx, this.tools.length - 1);
@@ -129,12 +130,20 @@ export class Player {
     G.fx.text(this.pos, `Dropped ${TOOLS[t].name}`, '#fff', 14);
     sfx('pickup');
   }
+  // Pick up a dropped tool. If you already have one of its kind, yours is left in its place.
   pickUpTool(pk, t) {
-    this.tools.push(t);
-    this.toolIdx = this.tools.length - 1;
-    if (t === 'can') this.can = 0;
-    if (t === 'spray') this.spray = 0;
+    const mine = this.tools.findIndex((k) => toolBase(k) === toolBase(t));
     removePickup(pk);
+    if (mine >= 0) {
+      spawnPickup('tool:' + this.tools[mine], 1, pk.pos.x, pk.pos.z, 0, false);
+      this.tools[mine] = t;
+      this.toolIdx = mine;
+    } else {
+      this.tools.push(t);
+      this.toolIdx = this.tools.length - 1;
+    }
+    if (toolBase(t) === 'can') this.can = 0;
+    if (t === 'spray') this.spray = 0;
     sfx('pickup');
   }
 
@@ -160,7 +169,7 @@ export class Player {
     this.stun = 0;
   }
   resetForNewGame() {
-    this.tools = ['hands']; this.toolIdx = 0; this.carry = null; this.can = 0; this.spray = 0; this.stall = null; this.sellAct = null;
+    this.tools = ['hands']; this.toolIdx = 0; this.bag = null; this.carry = null; this.can = 0; this.spray = 0; this.stall = null; this.sellAct = null;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
     this.pos.set(SPAWNS[this.idx][0], 0, SPAWNS[this.idx][1]);
     this.facing = 0;
@@ -178,7 +187,7 @@ export class Player {
     let mx = inp.mx, mz = inp.mz;
     if (this.stun > 0) { mx = 0; mz = 0; }
     const slow = this.tool === 'hose' && inp.held.x ? 0.6 : 1;
-    const speed = 6.5 * (G.upgrades.has('shoes') ? 1.25 : 1) * slow * (1 - this.loadSlow);
+    const speed = 6.5 * slow * (1 - this.loadSlow);
     this.kv.multiplyScalar(Math.exp(-8 * dt));
     this.tryMove((mx * speed + this.kv.x) * dt, (mz * speed + this.kv.z) * dt);
     const mag = Math.hypot(mx, mz);
@@ -311,6 +320,12 @@ export class Player {
           if (plant) return { id: 'dew', at: plant, label: `Water ${plant.def.name}`, run: () => this.dew(plant) };
           if (this.heartNear()) return { id: 'dewh', label: 'Water the Heart', run: () => this.dew(G.heart) };
           break;
+        case 'mulch':
+          if (this.heartNear()) {
+            if (G.heart.hp >= G.heart.maxHp) return { id: 'mulchfull', label: 'Heart is healthy', off: true };
+            return { id: 'mulch', label: `Mulch the Heart +${MULCH_HEAL} HP`, run: () => this.mulch() };
+          }
+          break;
         case 'weed': {
           const bin = G.placeables.find((p) => p.type === 'compost' && !p.dead && dist2(p.pos, this.pos) < 2.6);
           if (bin) return { id: 'compost', at: bin.pos, label: `Compost weeds (${bin.store}/4)`, run: () => { bin.addWeeds(carry.count); this.carry = null; sfx('plant'); } };
@@ -327,6 +342,8 @@ export class Player {
     if (pk && pk.kind.startsWith('tool:')) {
       const t = pk.kind.slice(5);
       if (this.tools.includes(t)) return { id: 'owned', at: pk.pos, label: 'Already have one', off: true };
+      const mine = this.tools.find((k) => toolBase(k) === toolBase(t));
+      if (mine) return { id: 'swaptool', at: pk.pos, label: `Swap for ${TOOLS[t].name}`, run: () => this.pickUpTool(pk, t) };
       return { id: 'picktool', at: pk.pos, label: `Pick up ${TOOLS[t].name}`, run: () => this.pickUpTool(pk, t) };
     }
     if (pk && !this.canTake(pk.kind)) {
@@ -398,6 +415,13 @@ export class Player {
     if (p.stage < 4) p.growth = Math.min(1, p.growth + g); else p.size = Math.min(p.def.maxSize, p.size + s);
     this.take(1);
     G.fx.burst({ x: p.pos.x, y: 0.8, z: p.pos.z }, sunny ? 0xffeb3b : 0x26a69a, 16, { speed: 3, emissive: sunny });
+    sfx('bloom');
+  }
+  mulch() {
+    G.heart.hp = Math.min(G.heart.maxHp, G.heart.hp + MULCH_HEAL);
+    this.take(1);
+    G.fx.burst({ x: 0, y: 1.5, z: 0 }, 0xff6fa8, 24, { speed: 4 });
+    G.fx.text({ x: 0, y: 3, z: 0 }, `+${MULCH_HEAL} HP`, '#ff8fc0', 20);
     sfx('bloom');
   }
   dew(target) {
@@ -514,7 +538,7 @@ export class Player {
         break;
       case 'shovel':
         if (pressed && this.cool <= 0) {
-          const sharp = G.upgrades.has('sharp');
+          const sharp = this.toolKey === 'steelshovel';
           this.cool = sharp ? 0.28 : 0.42; this.swingT = 0.3;
           sfx('swing');
           if (!this.melee(1.8, 1.0, sharp ? 4 : 2, 8, 'shovel')) {
@@ -530,13 +554,13 @@ export class Player {
         break;
       case 'can':
         if (pressed && this.nearWater()) {
-          this.can = CAN_CAP * (G.upgrades.has('bigcan') ? 2 : 1);
+          this.can = this.canCap;
           G.fx.burst({ x: this.pos.x, y: 0.5, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
           this.say('Filled!', '#81d4fa'); sfx('splash');
         } else if (held && !this.nearWater()) {
           if (this.can <= 0) { if (pressed) sfx('error'); break; }
           this.pouring = true;
-          const rate = (G.upgrades.has('bigcan') ? 1.0 : 0.6) * dt;
+          const rate = (this.toolKey === 'goldcan' ? 1.0 : 0.6) * dt;
           const amt = Math.min(this.can, rate);
           this.can -= amt;
           const p = this.plantInFront();
@@ -600,7 +624,7 @@ export class Player {
           const tp = this.toolPos();
           for (let i = 0; i < 3; i++) G.fx.stream(tp, new THREE.Vector3(this.dir.x, 0.15, this.dir.z), 0x4fc3f7, { speed: 12, spread: 0.1, life: 0.45 });
           sfx('water', 0.2);
-          const soap = G.upgrades.has('soaphose');
+          const soap = this.toolKey === 'soaphose';
           this.cone(6.5, 0.38, (e, k) => {
             if (k === 'plant' || k === 'heart') { e.addWater(0.9 * dt); this.stats.water += 0.9 * dt; if (soap && k === 'plant' && e.mites > 0) { const r = Math.min(e.mites, 8 * dt); e.mites -= r; G.stats.mites += r; } }
             else if (e.canBeHitBy('hose')) {
@@ -645,7 +669,7 @@ export class Player {
   hoseTooFar() { return Math.hypot(this.pos.x - SPIGOT.x, this.pos.z - SPIGOT.z) > HOSE_LEN; }
 
   shoot(kind = 'gun') {
-    const hot = G.upgrades.has('potato');
+    const hot = this.toolKey === 'hotgun';
     const W = {
       slingshot: { dmg: 3, speed: 24, life: 0.75, size: 0.35, color: 0x9e9e9e, assist: 0.5, recoil: 1, spread: 0, sound: 'sling', pierce: false },
       gun: { dmg: hot ? 10 : 6, speed: 30, life: 0.85, size: 0.7, color: hot ? 0xff7043 : 0xc49a5a, assist: 0.35, recoil: 6, spread: 0, sound: 'shoot', pierce: hot },
@@ -716,11 +740,11 @@ export class Player {
     m.legL.rotation.x = w; m.legR.rotation.x = -w;
     m.group.position.y = Math.abs(Math.sin(this.t * 13)) * 0.06 * Math.min(1, mag);
     // tool mesh
-    if (this.equipped !== this.tool) {
-      this.equipped = this.tool;
+    if (this.equipped !== this.toolKey) {
+      this.equipped = this.toolKey;
       m.tool.clear();
       if (this.tool !== 'hands') {
-        const t = makeTool(this.tool);
+        const t = makeTool(this.toolKey);
         t.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         m.tool.add(t);
       }

@@ -1,6 +1,6 @@
 // Prints the plant economy and the market's unlock/price curve so balance changes are made with
 // numbers, not guesses. Run: npm run balance
-import { PLANTS, SOIL, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, DAY_LEN, REGROW_AT, TIER_MULT } from '../src/config.js';
+import { PLANTS, SOIL, SHOPS, DEFS, DAY_LEN, REGROW_AT, TIER_MULT } from '../src/config.js';
 
 // Daylight sunlight integral, matching game.js: sun = clamp(1.5·sin(πp), 0, 1). Sun-lovers grow at
 // 1.5·sun^need (plants.js). Result: "rate-seconds" of growth per day, before soil.
@@ -40,15 +40,12 @@ for (const d of rows) {
 }
 
 console.log('\nMarket by unlock day');
-const all = [
-  ...Object.entries(PLANTS).map(([, d]) => ({ ...d, cat: 'seed' })),
-  ...Object.entries(TOOLS).filter(([k]) => k !== 'hands').map(([, d]) => ({ ...d, cat: d.weapon ? 'pest' : 'tool' })),
-  ...Object.values(PLACEABLES).map((d) => ({ ...d, cat: 'gadget' })),
-  ...Object.values(SUPPLIES).map((d) => ({ ...d, cat: 'care' })),
-  ...Object.values(UPGRADES).map((d) => ({ ...d, cat: 'upgrade' })),
-];
+const all = SHOPS.flatMap((s) => s.items.map(([kind, key]) => ({ ...DEFS[kind][key], cat: s.id })));
 const days = [...new Set(all.map((d) => d.unlock))].sort((a, b) => a - b);
 for (const day of days) {
   const list = all.filter((d) => d.unlock === day).sort((a, b) => a.cost - b.cost);
   console.log(`Day ${pad(day, 2)}: ${list.map((d) => `${d.name} ${money(d.cost)}`).join(' · ')}`);
 }
+
+console.log('\nShops (left to right)');
+for (const s of SHOPS) console.log(`${s.icon} ${s.name.padEnd(13)} ${s.items.map(([kind, key]) => `${DEFS[kind][key].name} d${DEFS[kind][key].unlock} ${money(DEFS[kind][key].cost)}`).join(' · ')}`);

@@ -1,12 +1,12 @@
-// Item icons. Tools, gadgets, supplies and a few upgrades get an icon rendered from their own 3D
+// Item icons. Tools, bags, gadgets and supplies get an icon rendered from their own 3D
 // model (once, at startup), so the icon in the shop/HUD is exactly what you see in the world.
 // Plants and the rest keep their emoji, which already read clearly.
 //
 // Icon ids match carried-item kinds: 'tool:shovel', 'kit:fence', 'soil', 'seed:daisy',
-// 'produce:daisy', 'weed', 'junk', plus 'upgrade:<key>' for upgrades.
+// 'produce:daisy', 'weed', 'junk', plus 'bag:<key>' for bags.
 import * as THREE from 'three';
-import { TOOLS, PLACEABLES, SUPPLIES, UPGRADES, PLANTS, itemInfo } from './config.js';
-import { makeTool, makePlaceable, makeItem, makeWheelbarrow } from './models.js';
+import { TOOLS, BAGS, PLACEABLES, SUPPLIES, PLANTS, itemInfo, toolBase } from './config.js';
+import { makeTool, makePlaceable, makeItem, makeBag } from './models.js';
 
 const SIZE = 128;
 const icons = new Map(); // id -> { url, canvas }
@@ -14,14 +14,14 @@ const icons = new Map(); // id -> { url, canvas }
 // What each rendered icon is built from.
 function builders() {
   const b = {};
-  for (const k of Object.keys(TOOLS)) if (k !== 'hands') b['tool:' + k] = () => tilt(makeTool(k, { reel: k === 'hose' }), k === 'hose' ? 0 : -0.75);
+  for (const k of Object.keys(TOOLS)) {
+    const reel = toolBase(k) === 'hose';
+    if (k !== 'hands') b['tool:' + k] = () => tilt(makeTool(k, { reel }), reel ? 0 : toolBase(k) === 'can' ? -0.3 : -0.75);
+  }
+  for (const k of Object.keys(BAGS)) b['bag:' + k] = () => makeBag(k);
   for (const k of Object.keys(PLACEABLES)) b['kit:' + k] = () => makePlaceable(k).group;
   for (const k of Object.keys(SUPPLIES)) b[k] = () => makeItem(k);
   b.junk = () => makeItem('junk');
-  b['upgrade:bigcan'] = () => tilt(makeTool('can', { gold: true }), -0.3);
-  b['upgrade:sharp'] = () => tilt(makeTool('shovel', { sharp: true }), -0.75);
-  b['upgrade:potato'] = () => tilt(makeTool('gun', { hot: true }), -0.75);
-  b['upgrade:wheelbarrow'] = () => makeWheelbarrow();
   return b;
 }
 function tilt(obj, z) {
@@ -87,7 +87,6 @@ function sticker(src) {
 // The emoji used when there's no rendered icon.
 export function iconEmoji(id) {
   const [k, sub] = id.split(':');
-  if (k === 'upgrade') return UPGRADES[sub]?.icon ?? '?';
   if (k === 'plant') return PLANTS[sub]?.icon ?? '?';
   return itemInfo(id).icon;
 }

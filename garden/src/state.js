@@ -12,7 +12,6 @@ export const G = {
   weather: 'clear', // clear | rain | heat
   hotItem: 'daisy',
   money: 0,
-  upgrades: new Set(),
   seen: new Set(), // market items a gnome has browsed (anything unlocked and unseen is NEW)
   endless: false,
   // entities
@@ -42,6 +41,18 @@ export function attackedThings() {
   if (recent(G.heart)) out.push(G.heart);
   if (recent(G.jar)) out.push(G.jar);
   return out;
+}
+
+// Everything the camera keeps in view besides the gnomes: things under attack, plus anything that
+// is being hurt by neglect right now (no water, mites, nearly dead) and a thirsty Heart Bloom.
+export function needsAttention(pl) {
+  return pl.waterState === 'none' || pl.mites >= 1 || pl.hp < pl.maxHp * 0.4;
+}
+export function attentionThings() {
+  const out = new Set(attackedThings());
+  for (const p of G.plants) if (!p.dead && needsAttention(p)) out.add(p);
+  if (G.heart && !G.heart.dead && G.heart.waterState !== 'ok') out.add(G.heart);
+  return [...out];
 }
 
 export const activePlayers = () => G.slots.filter((p) => p && p.active);

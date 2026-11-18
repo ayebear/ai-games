@@ -1,6 +1,6 @@
 // Procedural low-poly models built from cached primitive geometries & materials.
 import * as THREE from 'three';
-import { PLANTS } from './config.js';
+import { PLANTS, TOOLS, toolBase } from './config.js';
 
 const mats = new Map();
 export function mat(color, opts = {}) {
@@ -92,12 +92,15 @@ export function makeGnome(color) {
   return { group: g, legL, legR, armL, armR, tool, lantern, flame, hat, carry, ring };
 }
 
-// Tools are built along +y (handle at the bottom). opts: { gold, sharp, hot, reel } for upgrade
-// and icon variants.
-export function makeTool(id, opts = {}) {
+// Tools are built along +y (handle at the bottom). A better tool (TOOLS[key].base) is its base
+// tool's model with its own look flags (TOOLS[key].model: gold, sharp, hot, soap). opts.reel draws
+// a hose as a reel (for icons and the shop table).
+export function makeTool(key, opts = {}) {
   const g = new THREE.Group();
   const steel = mat(METAL, { metalness: 0.55, roughness: 0.35 });
-  switch (id) {
+  opts = { ...TOOLS[key]?.model, ...opts };
+  const hoseCol = opts.soap ? [0xec407a, 0xf48fb1] : [0x388e3c, 0x43a047];
+  switch (toolBase(key)) {
     case 'shovel': {
       P(g, CYL(6), mat(WOOD), [0, 0.3, 0], [0.035, 0.95, 0.035]);
       P(g, TORUS(), mat(WOOD), [0, -0.24, 0], [0.09, 0.07, 0.09]); // D-grip
@@ -162,14 +165,15 @@ export function makeTool(id, opts = {}) {
     case 'hose':
       if (opts.reel) {
         // icon: a reel of green hose with a yellow nozzle
-        for (let i = 0; i < 3; i++) P(g, TORUS(), mat(i % 2 ? 0x388e3c : 0x43a047), [0, 0.35, -0.06 + i * 0.06], [0.3 - i * 0.02, 0.3 - i * 0.02, 0.35]);
+        for (let i = 0; i < 3; i++) P(g, TORUS(), mat(hoseCol[i % 2]), [0, 0.35, -0.06 + i * 0.06], [0.3 - i * 0.02, 0.3 - i * 0.02, 0.35]);
         P(g, CYL(10), mat(0xd84315), [0, 0.35, 0], [0.1, 0.24, 0.1], [Math.PI / 2, 0, 0]);
         P(g, CYL(8), mat(0xffc107), [0.3, 0.1, 0.1], [0.05, 0.25, 0.05], [0, 0, -0.6]);
         P(g, BOX(), mat(0xffc107), [0.22, 0.0, 0.1], [0.06, 0.14, 0.06]);
       } else {
         P(g, CYL(8), mat(0xffc107), [0, 0.22, 0], [0.055, 0.4, 0.055]);
         P(g, BOX(), mat(0xffc107), [0, 0.02, 0.06], [0.06, 0.16, 0.06], [0.4, 0, 0]);
-        P(g, CYL(8, 0.6), mat(0x2e7d32), [0, -0.1, 0], [0.07, 0.24, 0.07]);
+        P(g, CYL(8, 0.6), mat(opts.soap ? 0xc2185b : 0x2e7d32), [0, -0.1, 0], [0.07, 0.24, 0.07]);
+        if (opts.soap) P(g, SPH(8, 6), mat(0xf8bbd0, { transparent: true, opacity: 0.8 }), [0.08, 0.3, 0.05], 0.06); // soap bubble
       }
       break;
   }
@@ -597,7 +601,7 @@ export function makePlaceable(type) {
 }
 
 // ───────────────────────── Items ─────────────────────────
-// Emoji painted onto a canvas texture (seed packet pictures, upgrade emblems).
+// Emoji painted onto a canvas texture (seed packet pictures).
 const emojiTexCache = new Map();
 export function emojiTex(icon, bg = null) {
   const key = icon + '|' + bg;
@@ -615,7 +619,27 @@ export function emojiTex(icon, bg = null) {
   return t;
 }
 
-export function makeWheelbarrow() {
+// Bags (worn per gnome). Built standing on y=0.
+export function makeBag(key) {
+  if (key === 'wheelbarrow') return makeWheelbarrow();
+  const g = new THREE.Group();
+  if (key === 'satchel') {
+    const cloth = mat(0xa1887f);
+    P(g, BOX(), cloth, [0, 0.2, 0], [0.42, 0.34, 0.16]);
+    P(g, BOX(), mat(0x8d6e63), [0, 0.32, 0.085], [0.43, 0.14, 0.02]); // flap
+    P(g, TORUS(), mat(0x6d4c41), [0, 0.42, 0], [0.2, 0.2, 0.2], [0, Math.PI / 2, 0]); // strap
+  } else {
+    const cloth = mat(0x2e7d6b);
+    P(g, BOX(), cloth, [0, 0.3, 0], [0.42, 0.56, 0.26]);
+    P(g, SPH(10, 6), cloth, [0, 0.58, 0], [0.21, 0.08, 0.13]);
+    P(g, BOX(), mat(0x26a69a), [0, 0.2, 0.15], [0.3, 0.22, 0.08]); // front pocket
+    P(g, BOX(), mat(0xffc107), [0, 0.42, 0.135], [0.06, 0.06, 0.02]); // buckle
+    for (const sx of [-1, 1]) P(g, BOX(), mat(0x1b5e50), [sx * 0.12, 0.32, -0.15], [0.05, 0.48, 0.03]);
+  }
+  return g;
+}
+
+function makeWheelbarrow() {
   const g = new THREE.Group();
   const red = mat(0xd84336);
   P(g, BOX(), red, [0, 0.45, 0], [0.6, 0.12, 0.8]);
@@ -729,6 +753,13 @@ export function makeItem(kind) {
       P(g, CYL(12), mat(0x43a047), [0, 0.2, 0], [0.155, 0.16, 0.155]);
       P(g, CYL(8), mat(0x2e7d32), [0, 0.44, 0], [0.07, 0.08, 0.07]);
       P(g, SPH(8, 6), mat(0xaed581), [0, 0.2, 0.15], [0.07, 0.04, 0.02], [0, 0, 0.6]);
+      break;
+    case 'mulch':
+      // a pink sack of petal mulch
+      P(g, SPH(12, 8), mat(0xf8bbd0), [0, 0.22, 0], [0.24, 0.26, 0.2]);
+      P(g, CYL(12), mat(0xf8bbd0), [0, 0.42, 0], [0.18, 0.1, 0.15]);
+      P(g, HEMI(), mat(0x6d4c41), [0, 0.46, 0], [0.16, 0.08, 0.13]);
+      for (let i = 0; i < 4; i++) P(g, SPH(6, 4), mat(0xff6fa8), [Math.cos(i * 1.7) * 0.07, 0.5, Math.sin(i * 1.7) * 0.06], [0.04, 0.015, 0.03]);
       break;
     case 'sunjar':
       P(g, CYL(12), mat(0xe0f7fa, { transparent: true, opacity: 0.4, roughness: 0.05 }), [0, 0.2, 0], [0.16, 0.38, 0.16]);

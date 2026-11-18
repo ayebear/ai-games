@@ -35,7 +35,7 @@ Press a button on each controller once after the page loads so the browser can s
 
 | File | Purpose |
 |---|---|
-| `src/config.js` | All tuning data: plant economy formula, plants, tools, gadgets, supplies, upgrades, shops, enemies |
+| `src/config.js` | All tuning data: plant economy formula, plants, tools, bags, gadgets, supplies, shops (auto-sorted), enemies |
 | `src/game.js` | Game flow: day/night, joining/leaving, projectiles, camera, lights |
 | `src/players.js` | Gnome movement, context actions, tools, carrying |
 | `src/enemies.js` | Enemy AI and the wave Director |

@@ -4,16 +4,14 @@
 // The Quick Sell kiosk in the middle buys anything.
 import * as THREE from 'three';
 import {
-  PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, CAN_CAP, SPRAY_CAP, STALLS, SHOPS, MARKET, CELL, HALF, COUNTER,
-  itemInfo,
+  TOOLS, BAGS, DEFS, SPRAY_CAP, STALLS, SHOPS, MARKET, CELL, HALF, toolBase,
 } from './config.js';
 import { G, dist2 } from './state.js';
-import { P, mat, glow, BOX, CYL, CONE, PLANE, makeTool, makeItem, makePlaceable, makePlantModel, makeWheelbarrow, emojiTex } from './models.js';
+import { P, mat, glow, BOX, CYL, CONE, PLANE, makeTool, makeItem, makePlaceable, makePlantModel, makeBag } from './models.js';
 import { glyphsFor } from './input.js';
-import { iconHTML, drawIcon, stallIconId } from './icons.js';
+import { drawIcon, iconHTML, stallIconId } from './icons.js';
 import { sfx } from './audio.js';
 
-const DEFS = { seed: PLANTS, tool: TOOLS, kit: PLACEABLES, supply: SUPPLIES, upgrade: UPGRADES };
 const SHOP = Object.fromEntries(SHOPS.map((s) => [s.id, s]));
 const cellX = (i) => i * CELL - HALF + CELL / 2;
 const halfPrice = (n) => Math.max(1, Math.floor(n / 2));
@@ -30,17 +28,28 @@ const HEADER_H = 0.46;
 const PANEL_PX = { w: 300, h: 158 };
 const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
 
-// What a stall is selling right now (an upgrade path sells its first level you don't own yet).
+// What a stall sells.
 function stallItem(s) {
-  const key = s.chain ? s.chain.find((k) => !G.upgrades?.has(k)) ?? s.chain[s.chain.length - 1] : s.key;
-  const def = DEFS[s.kind][key];
+  const def = DEFS[s.kind][s.key];
   return {
-    kind: s.kind, key, def, cost: def.cost, unlock: def.unlock ?? 1, desc: def.desc, requires: def.requires,
-    icon: stallIconId(s.kind, key),
+    kind: s.kind, key: s.key, def, cost: def.cost, unlock: def.unlock ?? 1, desc: def.desc,
+    icon: stallIconId(s.kind, s.key),
     name: def.name, // on the board
     fullName: s.kind === 'seed' ? `${def.name} Seeds` : def.name, // on the card and receipts
-    level: s.chain ? s.chain.indexOf(key) + 1 : 0, levels: s.chain?.length ?? 0,
   };
+}
+
+// The tool or bag a gnome already has in this item's slot (same tool base, or any bag), or null.
+// `better`: what they have is this item or a better version, so there's nothing to buy.
+function ownedLike(p, it) {
+  if (it.kind === 'tool') {
+    const slot = p.tools.findIndex((t) => toolBase(t) === toolBase(it.key));
+    if (slot < 0) return null;
+    const key = p.tools[slot];
+    return { key, slot, def: TOOLS[key], better: key === it.key || !!TOOLS[key].base };
+  }
+  if (it.kind === 'bag' && p.bag) return { key: p.bag, def: BAGS[p.bag], better: BAGS[p.bag].cap >= it.def.cap };
+  return null;
 }
 
 export class Market {
@@ -87,22 +96,11 @@ export class Market {
     g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
     this.scene.add(g);
     const st = {
-      id: n, ...s, shopDef: shop, group: g, spin, canvas: cv, tex, boardMat, newTag, boardKey: '', itemKey: '',
+      id: n, ...s, item: stallItem(s), shopDef: shop, group: g, spin, canvas: cv, tex, boardMat, newTag, boardKey: '',
       pos: new THREE.Vector3(g.position.x, 0, g.position.z), phase: Math.random() * 6,
     };
-    this.refreshItem(st);
+    spin.add(displayFor(s.kind, s.key));
     return st;
-  }
-
-  // Swap in the stall's current item (upgrade paths move on to the next level).
-  refreshItem(st) {
-    const it = stallItem(st);
-    if (st.itemKey === it.key) return;
-    st.itemKey = it.key;
-    st.item = it;
-    st.spin.clear();
-    st.spin.add(displayFor(it.kind, it.key));
-    st.boardKey = '';
   }
 
   // Posts and the shop-name header that sit on top of the shop's row of panels.
@@ -213,7 +211,6 @@ export class Market {
     if (this.refreshT > 0) return;
     this.refreshT = 0.2;
     const closed = this.closed();
-    for (const st of this.stalls) this.refreshItem(st);
     for (const h of this.headers) drawHeader(h, closed, h.stalls.filter((st) => this.isNew(st)).length);
     for (const st of this.stalls) {
       const b = this.board(st);
@@ -232,8 +229,7 @@ export class Market {
   // NEW = unlocked after day 1 and no gnome has browsed it yet (G.seen, reset each game).
   isNew(st) {
     const it = st.item;
-    return G.state !== 'title' && it.unlock > 1 && G.day >= it.unlock && !G.seen.has(it.kind + ':' + it.key)
-      && !(it.kind === 'upgrade' && G.upgrades.has(it.key));
+    return G.state !== 'title' && it.unlock > 1 && G.day >= it.unlock && !G.seen.has(it.kind + ':' + it.key);
   }
 
   // What a stall's panel shows (the same for everyone).
@@ -241,7 +237,6 @@ export class Market {
     const it = st.item;
     if (G.day < it.unlock) return { key: 'lock' + it.unlock, locked: true, price: `Day ${it.unlock}`, col: '#9e9e9e' };
     const closed = this.closed();
-    if (it.kind === 'upgrade' && G.upgrades.has(it.key)) return { key: 'own' + closed, owned: true, price: '✔', col: '#9ccc65', dim: closed };
     const afford = G.money >= it.cost;
     const hot = it.kind === 'seed' && G.hotItem === it.key;
     const fresh = this.isNew(st);
@@ -264,10 +259,10 @@ export class Market {
   status(p, st) {
     const it = st.item;
     if (G.day < it.unlock) return { ok: false, reason: `Arrives day ${it.unlock}` };
-    if (it.kind === 'tool' && p.tools.includes(it.key)) return { ok: false, reason: 'You have this', owned: true };
-    if (it.kind === 'upgrade' && G.upgrades.has(it.key)) return { ok: false, reason: 'Bought', owned: true };
+    const own = ownedLike(p, it);
+    if (own && own.key === it.key) return { ok: false, reason: 'You have this', owned: true };
+    if (own && own.better) return { ok: false, reason: `You have ${own.def.name}`, owned: true };
     if (this.closed()) return { ok: false, reason: 'Closed till dawn' };
-    if (it.requires && !G.upgrades.has(it.requires)) return { ok: false, reason: `Needs ${UPGRADES[it.requires].name}` };
     if (G.money < it.cost) return { ok: false, reason: `Need $${it.cost - Math.floor(G.money)} more` };
     if (['seed', 'kit', 'supply'].includes(it.kind) && !p.canTake(carryKind(it))) return { ok: false, reason: p.fullWhy(carryKind(it)) };
     return { ok: true };
@@ -281,23 +276,25 @@ export class Market {
       const price = p.sellPrice();
       return { label: `Sell ×${c.count} +$${price}`, run: () => p.sell(st.pos) };
     }
-    if (it.kind === 'tool' && p.tools.includes(it.key)) {
+    if ((it.kind === 'tool' && p.tools.includes(it.key)) || (it.kind === 'bag' && p.bag === it.key)) {
       const price = halfPrice(it.cost);
-      return { label: `Sell yours +$${price}`, run: () => this.sellTool(p, st, price) };
+      return { label: `Sell yours +$${price}`, run: () => this.sellGear(p, st, price) };
     }
     return null;
   }
 
-  sellTool(p, st, price) {
-    const i = p.tools.indexOf(st.item.key);
-    if (i < 0) return;
-    p.tools.splice(i, 1);
-    p.toolIdx = Math.min(p.toolIdx, p.tools.length - 1);
+  // Sell back the tool or bag this stall sells.
+  sellGear(p, st, price) {
+    if (!removeGear(p, st.item.kind, st.item.key)) return;
+    this.pay(p, price, st.pos);
+  }
+
+  pay(p, price, pos) {
     G.money += price;
     G.stats.moneyEarned += price;
     p.stats.earned += price;
     p.stats.sold++;
-    G.fx.text({ x: st.pos.x, y: 2, z: st.pos.z }, `+$${price}`, '#ffd54f', 20);
+    G.fx.text({ x: pos.x, y: 2, z: pos.z }, `+$${price}`, '#ffd54f', 20);
     sfx('coin');
   }
 
@@ -311,20 +308,27 @@ export class Market {
     const rec = (p.stats.bought[it.kind + ':' + it.key] ??= { icon: it.icon, name: it.fullName, n: 0, spent: 0 });
     rec.n++;
     rec.spent += it.cost;
+    // a better tool or bag trades in the one you have, half price back
+    const old = ownedLike(p, it);
+    if (old) {
+      removeGear(p, it.kind, old.key, true);
+      this.pay(p, halfPrice(old.def.cost), { x: st.pos.x, z: st.pos.z + 0.8 });
+    }
     switch (it.kind) {
       case 'seed': case 'kit': case 'supply':
         p.give(carryKind(it));
         break;
-      case 'tool':
-        p.tools.push(it.key);
-        p.toolIdx = p.tools.length - 1;
-        if (it.key === 'can') p.can = CAN_CAP;
+      case 'tool': {
+        // a trade-in puts the new tool in the old one's slot
+        const at = old ? old.slot : p.tools.length;
+        p.tools.splice(at, 0, it.key);
+        p.toolIdx = at;
+        if (toolBase(it.key) === 'can') p.can = p.canCap;
         if (it.key === 'spray') p.spray = SPRAY_CAP;
         break;
-      case 'upgrade':
-        G.upgrades.add(it.key);
-        if (it.key === 'mulch') G.heart.hp += 150;
-        G.fx.toast(`${iconHTML(it.icon)} ${it.name}!`, it.desc);
+      }
+      case 'bag':
+        p.bag = it.key;
         break;
     }
     G.fx.text({ x: st.pos.x, y: 2, z: st.pos.z }, `-$${it.cost}`, '#ffcc80', 18);
@@ -349,9 +353,12 @@ export class Market {
       if (G.hotItem === it.key) facts.push('🔥 ×2 today');
       if (d.regrow) facts.push('♻️ Regrows');
       facts.push(d.grow < 55 ? 'Fast' : d.grow < 90 ? 'Medium' : 'Slow');
-    } else if (it.kind === 'tool') facts.push('Each gnome needs one');
-    else if (it.kind === 'kit') facts.push('Place in the garden');
-    else if (it.kind === 'upgrade') facts.push(it.levels ? `Level ${it.level}/${it.levels} · for everyone` : 'For everyone');
+    } else if (it.kind === 'tool' || it.kind === 'bag') {
+      facts.push('Each gnome needs one');
+      const old = ownedLike(p, it);
+      if (old && !old.better) facts.push(`Trade in ${old.def.name} +$${halfPrice(old.def.cost)}`);
+    } else if (it.kind === 'kit') facts.push('Place in the garden');
+    else if (it.key === 'mulch') facts.push('Use at the Heart Bloom');
     else facts.push('Use on a plant or plot');
     // the A line is always there; greyed out with the reason when you can't buy
     const lines = [s.ok ? `<div class="sa">${g.a} Buy</div>` : `<div class="sa off">${g.a} ${s.reason}</div>`];
@@ -378,20 +385,13 @@ function displayFor(kind, key) {
       holder.add(pk);
       break;
     }
-    case 'tool': obj = makeTool(key, { reel: key === 'hose' }); obj.rotation.z = key === 'hose' ? 0 : -0.5; size = 1.0; break;
+    case 'tool': {
+      const reel = toolBase(key) === 'hose';
+      obj = makeTool(key, { reel }); obj.rotation.z = reel ? 0 : -0.5; size = 1.0; break;
+    }
+    case 'bag': obj = makeBag(key); size = 0.9; break;
     case 'kit': obj = makePlaceable(key).group; size = 1.0; break;
     case 'supply': obj = makeItem(key); size = 0.6; break;
-    case 'upgrade': {
-      const model = { bigcan: () => makeTool('can', { gold: true }), sharp: () => makeTool('shovel', { sharp: true }), potato: () => makeTool('gun', { hot: true }), wheelbarrow: () => makeWheelbarrow() }[key];
-      if (model) { obj = model(); size = 0.9; break; }
-      // no model: the upgrade's emblem floating over a golden pedestal
-      P(holder, CYL(12), mat(0xe6a817, { metalness: 0.6, roughness: 0.35 }), [0, 0.1, 0], [0.38, 0.2, 0.38]);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(UPGRADES[key].icon), toneMapped: false }));
-      sp.position.y = 0.7;
-      sp.scale.setScalar(0.9);
-      holder.add(sp);
-      return holder;
-    }
   }
   obj.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(obj);
@@ -402,6 +402,21 @@ function displayFor(kind, key) {
   obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   holder.add(obj);
   return holder;
+}
+
+// Take a tool or bag off a gnome. Returns false if they don't have it. `keepSlot` leaves the tool
+// index alone (a trade-in puts the new tool back in the same slot).
+function removeGear(p, kind, key, keepSlot = false) {
+  if (kind === 'bag') {
+    if (p.bag !== key) return false;
+    p.bag = null;
+    return true;
+  }
+  const i = p.tools.indexOf(key);
+  if (i < 0) return false;
+  p.tools.splice(i, 1);
+  if (!keepSlot) p.toolIdx = Math.min(p.toolIdx, p.tools.length - 1);
+  return true;
 }
 
 function roundRect(x, X, Y, w, h, r) {

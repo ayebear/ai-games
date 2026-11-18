@@ -145,6 +145,17 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .mini .ring span { inset: 3px; font-size: 10px; }
 .mini .alert { position: relative; width: 20px; height: 20px; animation: bob 0.8s ease-in-out infinite; }
 .mini .alert span { position: absolute; inset: 0; border-radius: 50%; background: #3a0d0d; border: 2px solid #ff5252; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+/* water status icons: soggy (purple), low (orange), none (red, crossed-out drop, bobbing) */
+.wico { position: relative; width: 20px; height: 20px; flex: none; display: inline-block; vertical-align: middle; margin-left: 2px; }
+.wico span { position: absolute; inset: 0; border-radius: 50%; background: #10233a; border: 2px solid #4fc3f7; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.wico.soggy span { border-color: #b388ff; background: #24163a; }
+.wico.low span { border-color: #ffb74d; background: #3a2a10; }
+.wico.none { animation: bob 0.8s ease-in-out infinite; }
+.wico.none span { border-color: #ff5252; background: #3a0d0d; overflow: hidden; }
+.wico.none span::after { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; height: 2px; background: #ff5252; transform: rotate(-45deg); }
+.wico.big { width: 30px; height: 30px; }
+.wico.big span { font-size: 15px; border-width: 3px; }
+.wico.big.none span::after { height: 3px; }
 @keyframes bob { 50% { margin-top: -6px; } }
 .ftext { font-weight: 700; text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.7); white-space: nowrap; pointer-events: none; }
 
