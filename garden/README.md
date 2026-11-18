@@ -23,10 +23,9 @@ PORT=8080 npm run prod   # use a different port
 | Join / pause / leave | Start / tap Start / hold Start | Enter / tap / hold | Right Shift / tap / hold |
 | Move | Left stick, D-pad | WASD | Arrows |
 | Interact / buy at a stall | A | Space | . |
-| Use tool / sell at a stall | X or RT (hold for hose, can, sprayer) | J | , |
-| Drop / throw | B / Y | K / L | / / ; |
-| Drop equipped tool | hold B | hold K | hold / |
-| Switch tool | LB / RB | Q / E | M / ' |
+| Use what's in your hands / sell at a stall | X or RT (hold for hose, can, sprayer) | J | , |
+| Drop / throw what's in your hands | B / Y | K / L | / / ; |
+| Switch what's in your hands | LB / RB | Q / E | M / ' |
 | Pause | Back | Esc | Esc |
 
 Press a button on each controller once after the page loads so the browser can see it.
@@ -37,7 +36,7 @@ Press a button on each controller once after the page loads so the browser can s
 |---|---|
 | `src/config.js` | All tuning data: plant economy formula, plants, tools, bags, gadgets, supplies, shops (auto-sorted), enemies |
 | `src/game.js` | Game flow: day/night, joining/leaving, projectiles, camera, lights |
-| `src/players.js` | Gnome movement, context actions, tools, carrying |
+| `src/players.js` | Gnome movement, the inventory (tools and items in one list), A actions, X item/tool use |
 | `src/enemies.js` | Enemy AI and the wave Director |
 | `src/plants.js` | Plant growth model (water/sun/soil) and the Heart Bloom |
 | `src/placeables.js` | Garden gadgets (sprinkler, zapper, lamp, …) |

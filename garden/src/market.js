@@ -9,13 +9,13 @@ import {
 import { G, dist2 } from './state.js';
 import { P, mat, glow, BOX, CYL, PLANE, makeTool, makeItem, makePlaceable, makePlantModel, makeBag } from './models.js';
 import { glyphsFor } from './input.js';
-import { drawIcon, iconHTML, stallIconId } from './icons.js';
+import { drawIcon, iconHTML, invIconHTML, stallIconId } from './icons.js';
 import { sfx } from './audio.js';
 
 const SHOP = Object.fromEntries(SHOPS.map((s) => [s.id, s]));
 const cellX = (i) => i * CELL - HALF + CELL / 2;
 const halfPrice = (n) => Math.max(1, Math.floor(n / 2));
-// The carried-item kind a purchase gives you.
+// The inventory kind a purchase gives you.
 const carryKind = (it) => (it.kind === 'seed' ? 'seed:' + it.key : it.kind === 'kit' ? 'kit:' + it.key : it.key);
 // Carried kinds a stall buys back: a seed stall also buys that plant's produce.
 const buysBack = (it) => (it.kind === 'seed' ? ['produce:' + it.key, 'seed:' + it.key] : it.kind === 'kit' || it.kind === 'supply' ? [carryKind(it)] : []);
@@ -43,10 +43,10 @@ function stallItem(s) {
 // `better`: what they have is this item or a better version, so there's nothing to buy.
 function ownedLike(p, it) {
   if (it.kind === 'tool') {
-    const slot = p.tools.findIndex((t) => toolBase(t) === toolBase(it.key));
-    if (slot < 0) return null;
-    const key = p.tools[slot];
-    return { key, slot, def: TOOLS[key], better: key === it.key || !!TOOLS[key].base };
+    const s = p.toolLike(it.key);
+    if (!s) return null;
+    const key = s.kind.slice(5);
+    return { key, def: TOOLS[key], better: key === it.key || !!TOOLS[key].base };
   }
   if (it.kind === 'bag' && p.bag) return { key: p.bag, def: BAGS[p.bag], better: BAGS[p.bag].cap >= it.def.cap };
   return null;
@@ -247,19 +247,20 @@ export class Market {
     if (own && own.better) return { ok: false, reason: `You have ${own.def.name}`, owned: true };
     if (this.closed()) return { ok: false, reason: 'Closed till dawn' };
     if (G.money < it.cost) return { ok: false, reason: `Need $${it.cost - Math.floor(G.money)} more` };
-    if (['seed', 'kit', 'supply'].includes(it.kind) && !p.canTake(carryKind(it))) return { ok: false, reason: p.fullWhy(carryKind(it)) };
+    if (['seed', 'kit', 'supply'].includes(it.kind) && !p.canTake(carryKind(it))) return { ok: false, reason: 'Bag full' };
+    if (it.kind === 'tool' && !p.toolFits(it.key)) return { ok: false, reason: 'Bag full' };
     return { ok: true };
   }
 
   // What X sells back at this stall for player p, or null.
   sellOption(p, st) {
     if (this.closed()) return null;
-    const it = st.item, c = p.carry;
-    if (c && buysBack(it).includes(c.kind)) {
-      const price = p.sellPrice();
-      return { label: `Sell ×${c.count} +$${price}`, run: () => p.sell(st.pos) };
-    }
-    if ((it.kind === 'tool' && p.tools.includes(it.key)) || (it.kind === 'bag' && p.bag === it.key)) {
+    const it = st.item;
+    // the matching stack in your hands, or else any matching stack in your bag
+    const kinds = buysBack(it);
+    const c = kinds.includes(p.held.kind) ? p.held : kinds.map((k) => p.stack(k)).find(Boolean);
+    if (c) return { label: `Sell ${c.count}×${invIconHTML(c.kind)} +$${p.priceOf([c])}`, run: () => p.sell([c], st.pos) };
+    if ((it.kind === 'tool' && p.hasTool(it.key)) || (it.kind === 'bag' && p.bag === it.key)) {
       const price = halfPrice(it.cost);
       return { label: `Sell yours +$${price}`, run: () => this.sellGear(p, st, price) };
     }
@@ -291,25 +292,18 @@ export class Market {
     const rec = (p.stats.bought[it.kind + ':' + it.key] ??= { icon: it.icon, name: it.fullName, n: 0, spent: 0 });
     rec.n++;
     rec.spent += it.cost;
-    // a better tool or bag trades in the one you have, half price back
+    // a better tool or bag trades in the one you have (it takes the old one's place), half price back
     const old = ownedLike(p, it);
-    if (old) {
-      removeGear(p, it.kind, old.key, true);
-      this.pay(p, halfPrice(old.def.cost), { x: st.pos.x, z: st.pos.z + 0.8 });
-    }
+    if (old) this.pay(p, halfPrice(old.def.cost), { x: st.pos.x, z: st.pos.z + 0.8 });
     switch (it.kind) {
       case 'seed': case 'kit': case 'supply':
-        p.give(carryKind(it));
+        p.give(carryKind(it), 1, 0, true);
         break;
-      case 'tool': {
-        // a trade-in puts the new tool in the old one's slot
-        const at = old ? old.slot : p.tools.length;
-        p.tools.splice(at, 0, it.key);
-        p.toolIdx = at;
+      case 'tool':
+        p.addTool(it.key);
         if (toolBase(it.key) === 'can') p.can = p.canCap;
         if (it.key === 'spray') p.spray = SPRAY_CAP;
         break;
-      }
       case 'bag':
         p.bag = it.key;
         break;
@@ -387,19 +381,14 @@ function displayFor(kind, key) {
   return holder;
 }
 
-// Take a tool or bag off a gnome. Returns false if they don't have it. `keepSlot` leaves the tool
-// index alone (a trade-in puts the new tool back in the same slot).
-function removeGear(p, kind, key, keepSlot = false) {
+// Take a tool or bag off a gnome. Returns false if they don't have it.
+function removeGear(p, kind, key) {
   if (kind === 'bag') {
     if (p.bag !== key) return false;
     p.bag = null;
     return true;
   }
-  const i = p.tools.indexOf(key);
-  if (i < 0) return false;
-  p.tools.splice(i, 1);
-  if (!keepSlot) p.toolIdx = Math.min(p.toolIdx, p.tools.length - 1);
-  return true;
+  return p.removeTool(key);
 }
 
 function roundRect(x, X, Y, w, h, r) {

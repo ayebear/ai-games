@@ -83,8 +83,8 @@ export function makeGnome(color) {
   P(lantern, BOX(), mat(0x333333), [0, 0.1, 0], [0.16, 0.04, 0.16]);
   const flame = P(lantern, SPH(8, 6), glow(0xffc35a, 2.5), [0, 0, 0], 0.07, [0, 0, 0], false);
   lantern.visible = false;
-  // carried item anchor (over the head)
-  const carry = grp(g, [0, 2.45, 0]);
+  // held item anchor: out in front, between both hands
+  const carry = grp(g, [0, 0.72, 0.5]);
   // selection ring under feet
   const ring = P(g, RING(), mat(color, { emissive: color, emissiveIntensity: 0.6, side: THREE.DoubleSide }), [0, 0.03, 0], 0.7, [-Math.PI / 2, 0, 0], false);
   // facing arrow at the gnome's feet

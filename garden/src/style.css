@@ -25,7 +25,6 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .go .btn.face { font-size: 20px; }
 .go .btn.pill, .go .btn.key { font-size: 16px; }
 #screen .keys .btn { font-size: 13px; }
-.tools .btn.pill { font-size: 11px; min-width: 2.2em; margin: 0 1px; }
 
 /* ── Top bar ── */
 #top { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 480px); display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -69,7 +68,7 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 #top .boss .bar i { background: linear-gradient(90deg, #80deea, #e1f5fe); }
 
 /* ── Player panels ── */
-.panel { position: absolute; width: 222px; background: rgba(18, 28, 20, 0.78); border: 3px solid var(--pc); border-radius: 16px; padding: 8px 12px; font-size: 13px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.panel { position: absolute; width: 250px; background: rgba(18, 28, 20, 0.78); border: 3px solid var(--pc); border-radius: 16px; padding: 8px 12px; font-size: 13px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
 .panel.p0 { top: 12px; left: 12px; }
 .panel.p1 { top: 12px; right: 12px; }
 .panel.p2 { bottom: 12px; left: 12px; }
@@ -79,23 +78,25 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .pname { font-weight: 700; font-size: 15px; color: var(--pc); display: flex; align-items: center; gap: 6px; }
 .pname small { margin-left: auto; }
 .pname .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); display: inline-block; }
-.tools { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
-.tools small { font-size: 10px; opacity: 0.6; padding: 0 2px; }
-.tool { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 2px solid transparent; font-size: 15px; opacity: 0.6; }
-.tool.on { border-color: var(--pc); background: rgba(255, 255, 255, 0.2); opacity: 1; transform: scale(1.1); }
-.tool .ico { width: 22px; height: 22px; vertical-align: 0; }
+.inv { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
+.inv .btn.pill { font-size: 10px; min-width: 2em; margin: 0; flex: none; }
+.istrip { flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; overflow: hidden; }
+.islot { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 34px; padding: 0 3px; border-radius: 9px; border: 2px solid transparent; opacity: 0.55; font-size: 18px; }
+.islot .ico { width: 22px; height: 22px; vertical-align: 0; }
+.islot .q { font-style: normal; font-weight: 700; font-size: 12px; letter-spacing: -0.5px; margin-right: 1px; }
+.islot.on { height: 50px; padding: 0 5px; border-color: var(--pc); background: rgba(255, 255, 255, 0.18); opacity: 1; font-size: 32px; }
+.islot.on .ico { width: 38px; height: 38px; }
+.islot.on .q { font-size: 16px; }
 /* Item icons: a rendered model (img) or an emoji (span.e), sized to the surrounding text */
 .ico { display: inline-block; width: 1.4em; height: 1.4em; vertical-align: -0.38em; object-fit: contain; }
 .ico.e { width: auto; height: auto; vertical-align: baseline; }
-.tname { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+.tname { font-size: 13px; text-align: center; margin-top: 2px; }
+.tname small { color: #ffd54f; }
 .meter { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-.carry { margin-top: 5px; font-size: 13px; }
-.carry.dim { opacity: 0.45; }
-.carry small { color: #ffd54f; }
 .load { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .load b { font-size: 12px; min-width: 38px; text-align: right; }
 .load b.full { color: #ff5252; animation: pulse 0.8s ease-in-out infinite; }
-.slowrow { font-size: 11px; color: #ffb74d; }
+.load .heavy { font-size: 15px; filter: drop-shadow(0 0 3px #ffb74d); }
 .buys { margin-top: 6px; font-size: 12px; text-align: left; max-height: 150px; overflow: hidden; }
 .buys .bh { opacity: 0.9; margin-bottom: 2px; }
 .buys .br { display: flex; justify-content: space-between; gap: 8px; opacity: 0.85; border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 1px 0; }

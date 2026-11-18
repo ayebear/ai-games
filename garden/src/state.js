@@ -66,6 +66,7 @@ export function newStats() {
     harvested: {}, plantsLost: 0, planted: 0,
     biggest: null, // {type, size, value}
     kills: {}, mites: 0, weeds: 0,
+    plantWater: 0, // water gnomes gave to plants (not the Heart): the checklist's last step
     nights: 0,
   };
 }

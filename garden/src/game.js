@@ -301,7 +301,7 @@ export class Game {
       const target = G.plants.find((p) => !p.dead && dist2(p.pos, { x, z }) < 1.3) || (Math.hypot(x, z) < G.heart.radius + 1 ? G.heart : null);
       G.fx.burst({ x, y: 0.4, z }, 0x4fc3f7, 10, { speed: 2.5 });
       sfx('splash');
-      if (target) { target.addWater(0.3); pr.owner.stats.water += 0.3; return; }
+      if (target) { pr.owner.waterIt(target, 0.3); return; }
     }
     spawnPickup(pr.item, 1, x, z, pr.value, false);
   }

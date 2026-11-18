@@ -22,6 +22,8 @@ function builders() {
   for (const k of Object.keys(PLACEABLES)) b['kit:' + k] = () => makePlaceable(k).group;
   for (const k of Object.keys(SUPPLIES)) b[k] = () => makeItem(k);
   b.junk = () => makeItem('junk');
+  // seed packets, for the inventory (seeds and produce share the plant's emoji)
+  for (const k of Object.keys(PLANTS)) b['packet:' + k] = () => makeItem('seed:' + k);
   return b;
 }
 function tilt(obj, z) {
@@ -98,6 +100,12 @@ export const stallIconId = (kind, key) => (kind === 'supply' ? key : `${kind}:${
 export function iconHTML(id, cls = '') {
   const ic = icons.get(id);
   return ic ? `<img class="ico ${cls}" src="${ic.url}" alt="">` : `<span class="ico e ${cls}">${iconEmoji(id)}</span>`;
+}
+
+// Inline HTML for an inventory stack's icon: Hands, a seed packet for seeds, else the item's icon.
+export function invIconHTML(kind, cls = '') {
+  if (kind === 'hands') return `<span class="ico e ${cls}">${TOOLS.hands.icon}</span>`;
+  return iconHTML(kind.startsWith('seed:') ? 'packet:' + kind.slice(5) : kind, cls);
 }
 
 // Draw an icon centered at (x, y) on a 2D canvas.

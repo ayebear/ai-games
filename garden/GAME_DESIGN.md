@@ -33,12 +33,11 @@ hungry creatures come for your plants. Survive as many nights as you can. The go
 | Leave | **Hold Start** (1 s) | Hold Enter | Hold Right Shift |
 | Move | Left stick / D-pad | WASD | Arrows |
 | Aim (optional) | Right stick | — | — |
-| Interact (pick up, plant, harvest, quick sell, **buy at a stall**) | **A** | Space | . (period) |
-| Use tool · **sell back at a stall** | **X** (hold for streams) | J | , (comma) |
-| Drop carried stack | **B** | K | / |
-| Drop equipped tool (share it) | **Hold B** (hands empty) | Hold K | Hold / |
-| Throw one carried item | **Y** | L | ; |
-| Switch tool | **LB / RB** | Q / E | M / ' |
+| Interact (pick up, harvest, pull weeds, scoop dew, quick sell, **buy at a stall**) | **A** | Space | . (period) |
+| Use what's in your hands · **sell back at a stall** | **X** (hold for streams) | J | , (comma) |
+| Drop what's in your hands (a stack, or a tool to share it) | **B** | K | / |
+| Throw one of what's in your hands | **Y** | L | ; |
+| Switch what's in your hands | **LB / RB** | Q / E | M / ' |
 
 - Players can join or leave **at any time**, including mid-game. Your slot remembers your tools,
   so you can rejoin without losing them.
@@ -75,16 +74,25 @@ You start with **$0, bare hands, and an overgrown garden**:
   can be fed to a Compost Bin later.
 - **Old junk** (boots, cans) is lying around and sells for $3.
 - A few **lost coins** sparkle in the grass.
-- **Dew drops** appear every morning. Carry them to a plant (or the Heart Bloom) to water it.
-  This is how you water before you own a can. Dew evaporates by midday, so collect it early.
+- **Dew drops** appear every morning, and the **pond never runs out**: press A at its edge (or at a
+  Rain Barrel) to scoop dew until your bag is full. Hold the dew and press X at a plant (or the Heart
+  Bloom) to water it. This is how you water before you own a can. Drops on the grass evaporate by
+  midday, but dew in your bag keeps.
 - There are **four old garden plots** near the Heart Bloom that are already dug, so you can plant
   before you own a shovel.
 
-Your first minute goes: pull weeds → sell → buy Daisy seeds ($3) → plant → water with dew →
-harvest → sell for profit → buy a **Shovel** (you each need one) → expand. The first four steps
-are a **Getting started checklist** at the bottom center of the screen. Each item ticks off as
-soon as it's done (in any order), the next unchecked one is highlighted, and the list goes away
-once all four are checked. A Daisy triples your
+Your first minute goes: pull weeds → sell → buy Daisy seeds ($3) → plant → get dew → water →
+harvest → sell for profit → buy a **Shovel** (you each need one) → expand. The first five steps
+are a **Getting started checklist** at the bottom center of the screen:
+
+1. Pull weeds and sell them at the Quick Sell kiosk
+2. Buy Daisy seeds at the Seeds shop
+3. Plant them in a dug plot near the Heart
+4. Get dew from the drops or the pond
+5. Water your plant (a gnome has to water a plant, not the Heart)
+
+Each item ticks off as soon as it's done (in any order), the next unchecked one is highlighted, and
+the list goes away once all five are checked. A Daisy triples your
 money; by Day 3 you'll want higher-tier seeds, which pay far more per plot.
 
 ---
@@ -260,8 +268,10 @@ big garden there's almost always one, which would keep the camera zoomed all the
 ## 5. Tools (bought per player)
 
 Each gnome holds **one tool of each kind**. A better version works like its base tool but
-stronger, and buying it trades in the base tool for half price. Dropped tools can be shared:
-picking up a tool you already have a version of swaps them.
+stronger, and buying it trades in the base tool for half price (the new one takes its place in your
+bag). Dropped tools can be shared: picking up a tool you already have a version of swaps them.
+Tools live in your bag with everything else and **have weight**: hand tools weigh 1, the hoses and
+spud guns 2, the Seed Blaster 3.
 
 **Garden Gear** shop (tools):
 
@@ -309,21 +319,53 @@ picking up a tool you already have a version of swaps them.
 - **Sun Jar** (Day 3, $20): use it on a plant for a big growth burst, or **throw it** to make a flash
   that **stuns every pest nearby and scares deer**. In daylight, a thrown jar boosts every plant it
   splashes.
-- **Heart Mulch** (Day 5, $40): carry it to the Heart Bloom to heal it 150 HP.
+- **Heart Mulch** (Day 5, $40): hold it at the Heart Bloom and press X to heal it 150 HP.
 
 ## 8. The Bag (inventory) & Selling
 
-- You carry **one stack of one item type**. Its size is limited by your bag's **capacity in weight**:
-  most items weigh 1, **Soil Bags and gadget kits weigh 2**, and **Giant Pumpkins and Watermelons weigh 3**.
-- Every player panel shows a **load meter** (`12/16`, turning orange then a flashing red **FULL**).
+- **Everything you own is one list:** ✋ Hands (always first, can't be dropped), then tools and
+  items in the order you got them. Items of the same kind stack. **LB / RB** turns the list; the
+  one in the middle is **in your hands**, shown in the world (a tool in your right hand, an item held
+  out in front with both hands).
+- **X uses what's in your hands**, so every item works like a tool:
+
+  | In your hands | X does |
+  |---|---|
+  | ✋ Hands | Punch |
+  | A tool | What the tool does (section 5) |
+  | Seeds | Plant them in the empty plot in front of you |
+  | Dew | Water the plant in front of you (or the Heart Bloom) |
+  | Soil Bag | Raise the plot in front of you one soil level |
+  | Fertilizer, Sun Jar | Boost the plant in front of you |
+  | Heart Mulch | Heal the Heart Bloom (stand at it) |
+  | Gadget kit | Place it on the cell in front of you |
+  | Weeds, junk, produce | Throw one |
+
+  **Y** throws one of any item (a thrown Sun Jar flashes, a thrown tomato splats, thrown dew waters
+  what it lands on). **B** drops the whole stack, or the tool, for a friend to pick up.
+- A **new kind of item goes into your hands** when you buy it, or when your hands were empty
+  (Hands selected). Otherwise it joins the end of the list and your hands stay as they are. When a
+  stack runs out, the next one in the list takes its place.
+- **Capacity is weight:** most items weigh 1, **Soil Bags and gadget kits weigh 2**, **Giant
+  Pumpkins and Watermelons weigh 3**, and **tools weigh 1–3** (dew too: 1 per drop).
 - **Heavy loads slow you down**, up to −30 % speed when the bag is full. That's the trade-off
   between one big haul to the counter and several quick trips.
-- **Anything you can pick up sells at the counter.** Weeds and dew sell for $1, junk for $3, and
-  produce for its size-based value (×2 if it's the Hot Item). Seeds, kits and supplies sell back
-  for **half price**, so you can undo a bad purchase or cash out spare gear.
-- Bags (Garden Gear shop, **per gnome**, worn, a bigger bag trades in the old one): pockets hold 5 ·
-  👜 **Satchel** 10 ($15, Day 1) · 🎒 **Backpack** 16 ($40, Day 3) · 🛒 **Wheelbarrow** 25 ($200,
+- **Selling:** at the 💰 Quick Sell kiosk (or a Sell Stand), A sells **all your garden goods at
+  once** (weeds $1, junk $3, produce for its size-based value, ×2 if it's the Hot Item). With no
+  garden goods, it sells the shop good in your hands (seeds, kits and supplies) back for **half
+  price**. Tools and bags sell back at their own stall (X). **Dew doesn't sell** (the pond is endless).
+- Bags (Garden Gear shop, **per gnome**, worn, a bigger bag trades in the old one): pockets hold 8 ·
+  👜 **Satchel** 14 ($15, Day 1) · 🎒 **Backpack** 22 ($40, Day 3) · 🛒 **Wheelbarrow** 32 ($200,
   Day 7), and a full wheelbarrow **never slows you down**.
+
+### Player panel
+
+Each gnome's corner panel is kept small: their name, the **inventory strip** (the stack in their
+hands, big, in the middle with its neighbors on each side, and the LB / RB buttons; each stack shows
+its count tight against its icon, like `5×🌿`), the name of what's in their hands (and what it sells
+for, for produce), a meter for the can, sprayer or Seed Blaster heat when one is in hand, and the
+**load bar** (`12/22`, orange then a flashing red **FULL**, with a 🏋️ when the load is slowing them
+down). Seeds show as seed packets so they don't look like the produce.
 
 ## 9. Progression
 

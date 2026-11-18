@@ -77,21 +77,22 @@ export const PLANTS = PLANT_DEFS;
 // ───────────────────────── Tools (per player) ─────────────────────────
 // Garden tools grow things; pest control (weapon: true) fights things. A better version of a tool
 // names its `base`: it works like the base tool but stronger, and buying it trades in the one you
-// have (half price back). A gnome only ever holds one tool of each base.
+// have (half price back). A gnome only ever holds one tool of each base. Tools sit in your bag
+// with everything else, so their `weight` counts toward your capacity (and slows you down).
 export const TOOLS = {
-  hands: { name: 'Hands', icon: '✋', cost: 0, unlock: 1, desc: 'Pull weeds, carry, harvest. Weak punch.' },
-  shovel: { name: 'Shovel', icon: '⛏️', cost: 10, unlock: 1, desc: 'Till plots, dig weeds, bonk pests and moles.' },
-  can: { name: 'Watering Can', icon: '🚿', cost: 12, unlock: 1, desc: 'Fill at the pond or a barrel. Hold to water.' },
-  steelshovel: { name: 'Steel Shovel', icon: '🗡️', base: 'shovel', cost: 45, unlock: 4, model: { sharp: true }, desc: 'A Shovel that hits 2× harder and swings faster.' },
-  goldcan: { name: 'Golden Can', icon: '🏆', base: 'can', cost: 50, unlock: 4, model: { gold: true }, desc: 'A Watering Can that holds double and pours faster.' },
-  hose: { name: 'Garden Hose', icon: '🌊', cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
-  soaphose: { name: 'Soap Hose', icon: '🧼', base: 'hose', cost: 160, unlock: 6, model: { soap: true }, desc: 'A Garden Hose whose spray also kills mites and burns slugs.' },
-  swatter: { name: 'Fly Swatter', icon: '🏓', cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
-  spray: { name: 'Soap Sprayer', icon: '🧴', cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
-  slingshot: { name: 'Slingshot', icon: '🪃', cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
-  gun: { name: 'Spud Gun', icon: '🥔', cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
-  mgun: { name: 'Seed Blaster', icon: '🔫', cost: 350, unlock: 6, weapon: true, desc: 'Hold to spray seeds. Overheats: fire in bursts.' },
-  hotgun: { name: 'Hot Spud Gun', icon: '🔥', base: 'gun', cost: 150, unlock: 5, weapon: true, model: { hot: true }, desc: 'A Spud Gun with flaming spuds that hit harder and pierce.' },
+  hands: { name: 'Hands', icon: '✋', weight: 0, cost: 0, unlock: 1, desc: 'Pull weeds, carry, harvest. Weak punch.' },
+  shovel: { name: 'Shovel', icon: '⛏️', weight: 1, cost: 10, unlock: 1, desc: 'Till plots, dig weeds, bonk pests and moles.' },
+  can: { name: 'Watering Can', icon: '🚿', weight: 1, cost: 12, unlock: 1, desc: 'Fill at the pond or a barrel. Hold to water.' },
+  steelshovel: { name: 'Steel Shovel', icon: '🗡️', weight: 1, base: 'shovel', cost: 45, unlock: 4, model: { sharp: true }, desc: 'A Shovel that hits 2× harder and swings faster.' },
+  goldcan: { name: 'Golden Can', icon: '🏆', weight: 1, base: 'can', cost: 50, unlock: 4, model: { gold: true }, desc: 'A Watering Can that holds double and pours faster.' },
+  hose: { name: 'Garden Hose', icon: '🌊', weight: 2, cost: 90, unlock: 4, desc: 'Endless water from the spigot. Pushes pests back.' },
+  soaphose: { name: 'Soap Hose', icon: '🧼', weight: 2, base: 'hose', cost: 160, unlock: 6, model: { soap: true }, desc: 'A Garden Hose whose spray also kills mites and burns slugs.' },
+  swatter: { name: 'Fly Swatter', icon: '🏓', weight: 1, cost: 6, unlock: 1, weapon: true, desc: 'One-hit flies and moths. Scares crows.' },
+  spray: { name: 'Soap Sprayer', icon: '🧴', weight: 1, cost: 25, unlock: 2, weapon: true, desc: 'Kills mites, burns slugs. Refill with water.' },
+  slingshot: { name: 'Slingshot', icon: '🪃', weight: 1, cost: 30, unlock: 3, weapon: true, desc: 'Quick pebbles. Picks off flies and crows.' },
+  gun: { name: 'Spud Gun', icon: '🥔', weight: 2, cost: 60, unlock: 3, weapon: true, desc: 'Long-range potatoes. The deer stopper.' },
+  mgun: { name: 'Seed Blaster', icon: '🔫', weight: 3, cost: 350, unlock: 6, weapon: true, desc: 'Hold to spray seeds. Overheats: fire in bursts.' },
+  hotgun: { name: 'Hot Spud Gun', icon: '🔥', weight: 2, base: 'gun', cost: 150, unlock: 5, weapon: true, model: { hot: true }, desc: 'A Spud Gun with flaming spuds that hit harder and pierce.' },
 };
 export const toolBase = (key) => TOOLS[key]?.base ?? key;
 export const CAN_CAP = 3;
@@ -99,12 +100,12 @@ export const SPRAY_CAP = 25;
 
 // ───────────────────────── Bags (per player, worn) ─────────────────────────
 // Every gnome starts with pockets that hold BASE_CAP. A bag replaces the one you wear (half price
-// back for the old one). Capacity is in weight units (see itemWeight).
-export const BASE_CAP = 5;
+// back for the old one). Capacity is in weight units (see itemWeight), and tools count too.
+export const BASE_CAP = 8;
 export const BAGS = {
-  satchel: { name: 'Satchel', icon: '👜', cost: 15, unlock: 1, cap: 10, desc: 'Carry 10 instead of 5.' },
-  backpack: { name: 'Backpack', icon: '🎒', cost: 40, unlock: 3, cap: 16, desc: 'Carry 16.' },
-  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 200, unlock: 7, cap: 25, noSlow: true, desc: 'Carry 25, and a full load never slows you down.' },
+  satchel: { name: 'Satchel', icon: '👜', cost: 15, unlock: 1, cap: 14, desc: 'Carry 14 instead of 8.' },
+  backpack: { name: 'Backpack', icon: '🎒', cost: 40, unlock: 3, cap: 22, desc: 'Carry 22.' },
+  wheelbarrow: { name: 'Wheelbarrow', icon: '🛒', cost: 200, unlock: 7, cap: 32, noSlow: true, desc: 'Carry 32, and a full load never slows you down.' },
 };
 
 // ───────────────────────── Gadgets (shared, placed on the grid) ─────────────────────────
@@ -216,12 +217,15 @@ export function itemInfo(kind) {
     default: return SUPPLIES[k] ? { name: SUPPLIES[k].name, icon: SUPPLIES[k].icon } : { name: kind, icon: '?' };
   }
 }
-// Everything you can pick up can be sold. Shop-bought goods sell back at half price.
-export const isSellable = (kind) => kind !== 'coin';
+// Everything you can pick up can be sold, except dew (the pond has endless dew). Shop-bought goods
+// sell back at half price.
+export const isSellable = (kind) => kind !== 'coin' && kind !== 'dew' && kind !== 'hands';
+// Garden goods: what the Quick Sell kiosk sells all at once.
+export const isLoot = (kind) => kind === 'weed' || kind === 'junk' || kind.startsWith('produce:');
 export function sellEach(kind) {
   const [k, sub] = kind.split(':');
   switch (k) {
-    case 'weed': case 'dew': return 1;
+    case 'weed': return 1;
     case 'junk': return 3;
     case 'seed': return Math.max(1, Math.floor(PLANTS[sub].cost / 2));
     case 'kit': return Math.max(1, Math.floor(PLACEABLES[sub].cost / 2));
@@ -230,5 +234,9 @@ export function sellEach(kind) {
   }
 }
 
-// Bag weight per item. Capacity is measured in weight, not item count.
-export const itemWeight = (kind) => (kind === 'produce:pumpkin' || kind === 'produce:watermelon' ? 3 : kind.startsWith('kit:') || kind === 'soil' ? 2 : 1);
+// Bag weight per item. Capacity is measured in weight, not item count. Hands weigh nothing.
+export function itemWeight(kind) {
+  if (kind === 'hands') return 0;
+  if (kind.startsWith('tool:')) return TOOLS[kind.slice(5)].weight ?? 1;
+  return kind === 'produce:pumpkin' || kind === 'produce:watermelon' ? 3 : kind.startsWith('kit:') || kind === 'soil' ? 2 : 1;
+}

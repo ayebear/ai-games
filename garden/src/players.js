@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {
   PLANTS, PLACEABLES, TOOLS, BAGS, BASE_CAP, PLAYER_COLORS, COUNTER, SPIGOT, POND, HOSE_LEN, CAN_CAP, SPRAY_CAP, SOIL, HALF, HEART_R,
-  MULCH_HEAL, itemInfo, isSellable, sellEach, itemWeight, toolBase,
+  MULCH_HEAL, itemInfo, isSellable, isLoot, sellEach, itemWeight, toolBase,
 } from './config.js';
+import { invIconHTML } from './icons.js';
 import { G, clamp, dist2, rand, activePlayers } from './state.js';
 import { makeGnome, makeTool, makeItem, CYL, BOX, RING, mat, P } from './models.js';
 import { sfx } from './audio.js';
@@ -11,6 +12,8 @@ import { Plant } from './plants.js';
 import { Placeable, canPlaceOn } from './placeables.js';
 
 const SPAWNS = [[-2, -13], [2, -13], [-2, -10], [2, -10]];
+const HANDS = () => ({ kind: 'hands', count: 1, value: 0 });
+const isTool = (kind) => kind.startsWith('tool:');
 const UP = new THREE.Vector3(0, 1, 0);
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 
@@ -24,15 +27,16 @@ export class Player {
     G.scene.add(this.model.group);
     this.pos = new THREE.Vector3(SPAWNS[idx][0], 0, SPAWNS[idx][1]);
     this.facing = 0;
-    this.tools = ['hands'];
-    this.toolIdx = 0;
+    // The inventory: one list of stacks { kind, count, value }. Hands are always first, then tools
+    // and items in the order you got them. `sel` is the one in your hands (LB / RB to switch).
+    this.inv = [HANDS()];
+    this.sel = 0;
     this.bag = null; // worn bag (BAGS key), null = just pockets
-    this.carry = null;
     this.can = 0; this.spray = 0;
     this.swingT = 0; this.cool = 0; this.holdT = 0; this.holdTarget = null; this.holdMax = 1;
     this.stall = null; this.sellAct = null; this.stun = 0; this.kv = new THREE.Vector3(); this.leaveT = 0; this.t = 0;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
-    this.equipped = null; this.carryShown = null; this.ctx = null; this.xLabel = ''; this.streaming = false; this.pouring = false;
+    this.equipped = null; this.ctx = null; this.use = null; this.xLabel = ''; this.streaming = false; this.pouring = false;
     this.msgT = 0;
     this.hose = new THREE.Mesh(CYL(6), mat(0x2e7d32));
     this.hose.visible = false;
@@ -65,6 +69,7 @@ export class Player {
     let at = null, shape = 'ring', r = 0.85;
     if (this.active && G.state === 'playing') {
       if (this.ctx && this.ctx.at) { at = this.ctx.at; shape = this.ctx.stall ? 'shop' : this.ctx.sq ? 'sq' : 'ring'; r = this.ctx.r ?? r; }
+      else if (this.use && this.use.at) { at = this.use.at; shape = this.use.sq ? 'sq' : 'ring'; }
       else {
         const t = this.tool;
         if (t === 'shovel') {
@@ -98,16 +103,20 @@ export class Player {
 
   get dir() { return { x: Math.sin(this.facing), z: Math.cos(this.facing) }; }
   front(d = 1.3) { return { x: this.pos.x + Math.sin(this.facing) * d, z: this.pos.z + Math.cos(this.facing) * d }; }
-  // Bag capacity (in weight units): pockets, or the bag this gnome wears.
+  // Bag capacity (in weight units): pockets, or the bag this gnome wears. Tools count too.
   get capacity() { return this.bag ? BAGS[this.bag].cap : BASE_CAP; }
-  get load() { return this.carry ? this.carry.count * itemWeight(this.carry.kind) : 0; }
+  get load() { return this.inv.reduce((n, s) => n + s.count * itemWeight(s.kind), 0); }
   get loadRatio() { return this.load / this.capacity; }
   // A heavy bag slows you down (up to -30% when full), except a wheelbarrow.
-  get loadSlow() { return this.bag && BAGS[this.bag].noSlow ? 0 : 0.3 * Math.pow(this.loadRatio, 1.5); }
-  // The equipped tool's key (e.g. 'steelshovel'), and what it works as (e.g. 'shovel').
-  get toolKey() { return this.tools[this.toolIdx]; }
-  get tool() { return toolBase(this.toolKey); }
-  get canCap() { return CAN_CAP * (this.tools.includes('goldcan') ? 2 : 1); }
+  get loadSlow() { return this.bag && BAGS[this.bag].noSlow ? 0 : 0.3 * Math.pow(Math.min(1, this.loadRatio), 1.5); }
+  // The stack in your hands, and if it's a tool, its key (e.g. 'steelshovel') and what it works as
+  // (e.g. 'shovel'). Anything that isn't a tool (or Hands) works as 'item'.
+  get held() { return this.inv[this.sel] ?? this.inv[0]; }
+  get toolKey() { const k = this.held.kind; return k === 'hands' ? 'hands' : isTool(k) ? k.slice(5) : null; }
+  get tool() { const k = this.toolKey; return k ? toolBase(k) : 'item'; }
+  get toolKeys() { return this.inv.filter((s) => isTool(s.kind)).map((s) => s.kind.slice(5)); }
+  hasTool(key) { return this.inv.some((s) => s.kind === 'tool:' + key); }
+  get canCap() { return CAN_CAP * (this.hasTool('goldcan') ? 2 : 1); }
 
   say(text, color = '#fff') {
     if (this.msgT > 0) return;
@@ -115,62 +124,78 @@ export class Player {
     G.fx.text(this.pos, text, color, 14);
   }
 
-  // ── Carry helpers ──
-  roomFor(kind) {
-    if (this.carry && this.carry.kind !== kind) return 0;
-    return Math.floor((this.capacity - this.load) / itemWeight(kind));
+  // ── Inventory ──
+  stack(kind) { return this.inv.find((s) => s.kind === kind); }
+  // The tool you have of the same kind (e.g. your Shovel when looking at a Steel Shovel).
+  toolLike(key) { return this.inv.find((s) => isTool(s.kind) && toolBase(s.kind.slice(5)) === toolBase(key)); }
+  roomFor(kind) { return Math.max(0, Math.floor((this.capacity - this.load) / itemWeight(kind))); }
+  // A tool fits if there's room for it once the one it replaces is gone.
+  toolFits(key) {
+    const old = this.toolLike(key);
+    return this.capacity - this.load + (old ? itemWeight(old.kind) : 0) >= itemWeight('tool:' + key);
   }
-  canTake(kind) { return this.roomFor(kind) > 0; }
-  give(kind, count = 1, value = 0) {
-    if (this.carry && this.carry.kind !== kind) return count;
+  canTake(kind) { return isTool(kind) ? this.toolFits(kind.slice(5)) : this.roomFor(kind) > 0; }
+  // Add items (not tools) to your stack of that kind, or a new stack at the end. A new stack goes
+  // into your hands if they were empty (or `select`, e.g. when you buy it). Returns how many didn't fit.
+  give(kind, count = 1, value = 0, select = false) {
     const n = Math.min(this.roomFor(kind), count);
-    if (!this.carry) this.carry = { kind, count: 0, value: 0 };
-    const per = count ? value / count : 0;
-    this.carry.count += n;
-    this.carry.value += per * n;
-    if (this.carry.count <= 0) this.carry = null;
+    if (n <= 0) return count;
+    let s = this.stack(kind);
+    if (!s) {
+      s = { kind, count: 0, value: 0 };
+      this.inv.push(s);
+      if (select || this.held.kind === 'hands') this.sel = this.inv.length - 1;
+    }
+    s.count += n;
+    s.value += (count ? value / count : 0) * n;
     return count - n;
   }
-  take(n = 1) {
-    const c = this.carry;
-    if (!c) return null;
-    const per = c.value / c.count;
-    c.count -= n;
-    c.value -= per * n;
-    const out = { kind: c.kind, value: per * n };
-    if (c.count <= 0) this.carry = null;
-    return out;
+  // Take n from a stack (the one in your hands by default).
+  take(s = this.held, n = 1) {
+    if (!s || s.kind === 'hands') return null;
+    const per = s.value / s.count;
+    s.count -= n;
+    s.value -= per * n;
+    if (s.count <= 0) this.removeStack(s);
+    return { kind: s.kind, value: per * n };
   }
-  dropCarry() {
-    if (!this.carry) return;
+  // Remove a stack. If it was in your hands, the next one in the list takes its place.
+  removeStack(s) {
+    const i = this.inv.indexOf(s);
+    if (i <= 0) return;
+    this.inv.splice(i, 1);
+    if (this.sel > i) this.sel--;
+    this.sel = Math.min(this.sel, this.inv.length - 1);
+  }
+  // Add a tool and put it in your hands. A tool of the same kind is replaced in place; returns its key.
+  addTool(key) {
+    const st = { kind: 'tool:' + key, count: 1, value: 0 };
+    const old = this.toolLike(key);
+    if (old) { const i = this.inv.indexOf(old); this.inv[i] = st; this.sel = i; }
+    else { this.inv.push(st); this.sel = this.inv.length - 1; }
+    return old ? old.kind.slice(5) : null;
+  }
+  removeTool(key) {
+    const s = this.stack('tool:' + key);
+    if (!s) return false;
+    this.removeStack(s);
+    return true;
+  }
+  // B: drop whatever is in your hands (the whole stack, or the tool, so a friend can take it).
+  dropHeld() {
+    const s = this.held;
+    if (s.kind === 'hands') return;
     const f = this.front(0.8);
-    spawnPickup(this.carry.kind, this.carry.count, f.x, f.z, this.carry.value);
-    this.carry = null;
-    sfx('pickup');
-  }
-
-  dropTool() {
-    const t = this.toolKey;
-    if (t === 'hands') return;
-    this.tools.splice(this.toolIdx, 1);
-    this.toolIdx = Math.min(this.toolIdx, this.tools.length - 1);
-    const f = this.front(0.9);
-    spawnPickup('tool:' + t, 1, f.x, f.z);
-    G.fx.text(this.pos, `Dropped ${TOOLS[t].name}`, '#fff', 14);
+    spawnPickup(s.kind, s.count, f.x, f.z, s.value);
+    this.removeStack(s);
+    if (isTool(s.kind)) G.fx.text(this.pos, `Dropped ${TOOLS[s.kind.slice(5)].name}`, '#fff', 14);
     sfx('pickup');
   }
   // Pick up a dropped tool. If you already have one of its kind, yours is left in its place.
   pickUpTool(pk, t) {
-    const mine = this.tools.findIndex((k) => toolBase(k) === toolBase(t));
     removePickup(pk);
-    if (mine >= 0) {
-      spawnPickup('tool:' + this.tools[mine], 1, pk.pos.x, pk.pos.z, 0, false);
-      this.tools[mine] = t;
-      this.toolIdx = mine;
-    } else {
-      this.tools.push(t);
-      this.toolIdx = this.tools.length - 1;
-    }
+    const old = this.addTool(t);
+    if (old) spawnPickup('tool:' + old, 1, pk.pos.x, pk.pos.z, 0, false);
     if (toolBase(t) === 'can') this.can = 0;
     if (t === 'spray') this.spray = 0;
     sfx('pickup');
@@ -182,7 +207,6 @@ export class Player {
   }
 
   leave() {
-    this.dropCarry();
     this.retSq.visible = this.retRing.visible = this.retShop.visible = false;
     this.stall = null; this.sellAct = null;
     this.active = false;
@@ -198,7 +222,7 @@ export class Player {
     this.stun = 0;
   }
   resetForNewGame() {
-    this.tools = ['hands']; this.toolIdx = 0; this.bag = null; this.carry = null; this.can = 0; this.spray = 0; this.stall = null; this.sellAct = null;
+    this.inv = [HANDS()]; this.sel = 0; this.bag = null; this.can = 0; this.spray = 0; this.stall = null; this.sellAct = null;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
     this.pos.set(SPAWNS[this.idx][0], 0, SPAWNS[this.idx][1]);
     this.facing = 0;
@@ -242,13 +266,8 @@ export class Player {
       this.holdT = 0; this.holdTarget = null;
       if (c && inp.pressed.a) c.run();
     }
-    if (inp.pressed.b && this.carry) { this.dropCarry(); this.bLock = true; }
-    if (!inp.held.b) { this.bLock = false; this.bHold = 0; }
-    else if (!this.bLock && this.tool !== 'hands') {
-      this.bHold = (this.bHold || 0) + dt;
-      if (this.bHold >= 0.6) { this.dropTool(); this.bLock = true; this.bHold = 0; }
-    }
-    if (inp.pressed.y && this.carry) this.throwOne();
+    if (inp.pressed.b) this.dropHeld();
+    if (inp.pressed.y && this.tool === 'item') this.throwOne();
 
     this.useTool(dt, inp);
     this.collectCoins(dt);
@@ -272,8 +291,8 @@ export class Player {
   }
 
   cycle(d) {
-    if (this.tools.length < 2) return;
-    this.toolIdx = (this.toolIdx + d + this.tools.length) % this.tools.length;
+    if (this.inv.length < 2) return;
+    this.sel = (this.sel + d + this.inv.length) % this.inv.length;
     sfx('pickup');
   }
 
@@ -310,11 +329,10 @@ export class Player {
     return best;
   }
 
+  // A: interact with the world in front of you (buy, sell, pick up, scoop dew, harvest, weed, pack up).
   computeContext() {
     const tc = this.targetCell();
     const own = G.world.cellAt(this.pos.x, this.pos.z);
-    const carry = this.carry;
-    const [ck, sub] = carry ? carry.kind.split(':') : [];
     // Market stall in front of you: A buys, X sells that item back (see useTool).
     this.sellAct = null;
     this.stall = G.market.stallNear(this);
@@ -323,116 +341,125 @@ export class Player {
       this.sellAct = G.market.sellOption(this, st);
       return { id: 'stall' + st.id, stall: st, at: st.pos, label: `Buy ${st.item.name}`, run: () => G.market.buy(this, st) };
     }
-    // Quick sell: the kiosk in the middle of the market, or a Sell Stand in the garden.
+    // Quick sell: the kiosk in the middle of the market, or a Sell Stand in the garden. It sells all
+    // your garden goods (weeds, junk, produce) at once; with none, the shop good in your hands.
     const atCounter = Math.hypot(this.pos.x - COUNTER.x, this.pos.z - COUNTER.z) < 3 && this.dir.z < 0.3;
     const stand = !atCounter && G.placeables.find((p) => p.type === 'sellbox' && !p.dead && dist2(p.pos, this.front(1.0)) < 1.4);
     if (atCounter || stand) {
-      if (carry && isSellable(carry.kind)) {
-        const price = this.sellPrice();
-        const where = stand ? stand.pos : { x: COUNTER.x, z: COUNTER.z - 1.2 };
-        return { id: 'sell', at: stand ? stand.pos : null, label: `Sell ×${carry.count} +$${price}`, run: () => this.sell(where) };
+      const where = stand ? stand.pos : { x: COUNTER.x, z: COUNTER.z - 1.2 };
+      const at = stand ? stand.pos : null;
+      const loot = this.inv.filter((s) => isLoot(s.kind));
+      const h = this.held;
+      if (loot.length) {
+        return { id: 'sell', at, label: `Sell ${loot.map((s) => invIconHTML(s.kind)).join('')} +$${this.priceOf(loot)}`, run: () => this.sell(loot, where) };
+      }
+      if (isSellable(h.kind) && !isTool(h.kind)) {
+        return { id: 'sellheld', at, label: `Sell ${h.count}×${invIconHTML(h.kind)} +$${this.priceOf([h])}`, run: () => this.sell([h], where) };
       }
       if (atCounter) return { id: 'counter', label: 'Nothing to sell', off: true };
     }
-    const plant = this.plantInFront();
-    if (carry) {
-      switch (ck) {
-        case 'seed':
-          if (tc && tc.type === 'plot' && !tc.plant) return { id: 'plant', at: tc, sq: true, label: `Plant ${PLANTS[sub].name}`, run: () => this.plantSeed(tc, sub) };
-          break;
-        case 'soil':
-          if (tc && tc.type === 'plot' && tc.soil < 3) return { id: 'soil', at: tc, sq: true, label: `Add soil → ${SOIL[tc.soil + 1].name}`, run: () => this.addSoil(tc) };
-          break;
-        case 'fertilizer':
-          if (plant && (plant.stage < 4 || plant.size < plant.def.maxSize)) return { id: 'fert', at: plant, label: `Fertilize ${plant.def.name}`, run: () => this.boost(plant, 0.25, 0.15) };
-          break;
-        case 'sunjar':
-          if (plant) return { id: 'jar', at: plant, label: `Sun Jar on ${plant.def.name}`, run: () => this.boost(plant, 0.35, 0.25, true) };
-          break;
-        case 'dew':
-          if (plant) return { id: 'dew', at: plant, label: `Water ${plant.def.name}`, run: () => this.dew(plant) };
-          if (this.heartNear()) return { id: 'dewh', label: 'Water the Heart', run: () => this.dew(G.heart) };
-          break;
-        case 'mulch':
-          if (this.heartNear()) {
-            if (G.heart.hp >= G.heart.maxHp) return { id: 'mulchfull', label: 'Heart is healthy', off: true };
-            return { id: 'mulch', label: `Mulch the Heart +${MULCH_HEAL} HP`, run: () => this.mulch() };
-          }
-          break;
-        case 'weed': {
-          const bin = G.placeables.find((p) => p.type === 'compost' && !p.dead && dist2(p.pos, this.pos) < 2.6);
-          if (bin) return { id: 'compost', at: bin.pos, label: `Compost weeds (${bin.store}/4)`, run: () => { bin.addWeeds(carry.count); this.carry = null; sfx('plant'); } };
-          break;
-        }
-        case 'kit':
-          if (canPlaceOn(tc) && !(PLACEABLES[sub].blocks && activePlayers().some((p) => G.world.cellAt(p.pos.x, p.pos.z) === tc))) {
-            return { id: 'place', at: tc, sq: true, label: `Place ${PLACEABLES[sub].name}`, run: () => this.place(tc, sub) };
-          }
-          break;
-      }
+    const weeds = this.stack('weed');
+    if (weeds) {
+      const bin = G.placeables.find((p) => p.type === 'compost' && !p.dead && dist2(p.pos, this.pos) < 2.6);
+      if (bin) return { id: 'compost', at: bin.pos, label: `Compost ${weeds.count}×${invIconHTML('weed')} (${bin.store}/4)`, run: () => { bin.addWeeds(weeds.count); this.removeStack(weeds); sfx('plant'); } };
     }
     const pk = this.nearestPickup();
-    if (pk && pk.kind.startsWith('tool:')) {
+    if (pk && isTool(pk.kind)) {
       const t = pk.kind.slice(5);
-      if (this.tools.includes(t)) return { id: 'owned', at: pk.pos, label: 'Already have one', off: true };
-      const mine = this.tools.find((k) => toolBase(k) === toolBase(t));
+      if (this.hasTool(t)) return { id: 'owned', at: pk.pos, label: 'Already have one', off: true };
+      if (!this.toolFits(t)) return { id: 'full', at: pk.pos, label: 'Bag full', off: true };
+      const mine = this.toolLike(t);
       if (mine) return { id: 'swaptool', at: pk.pos, label: `Swap for ${TOOLS[t].name}`, run: () => this.pickUpTool(pk, t) };
       return { id: 'picktool', at: pk.pos, label: `Pick up ${TOOLS[t].name}`, run: () => this.pickUpTool(pk, t) };
     }
-    if (pk && !this.canTake(pk.kind)) {
-      return { id: 'full', at: pk.pos, label: this.fullWhy(pk.kind), off: true };
-    }
+    if (pk && !this.canTake(pk.kind)) return { id: 'full', at: pk.pos, label: 'Bag full', off: true };
     if (pk) {
       const inf = itemInfo(pk.kind);
       return { id: 'pick', at: pk.pos, label: `Pick up ${inf.name}${pk.count > 1 ? ' ×' + pk.count : ''}`, run: () => this.pickUp(pk) };
     }
-    if (plant && plant.bloomed && this.canTake('produce:' + plant.type)) {
-      return { id: 'harvest', at: plant, label: `Harvest ${plant.def.name}`, run: () => this.harvest(plant) };
+    // the pond (and rain barrels) never run out of dew
+    if (this.nearWater() && this.roomFor('dew') > 0) {
+      const n = this.roomFor('dew');
+      return { id: 'scoop', label: `Scoop ${n}×${invIconHTML('dew')}`, run: () => this.scoopDew() };
     }
-    if (plant && plant.bloomed && carry) {
-      return { id: 'full', at: plant, label: this.fullWhy('produce:' + plant.type), off: true };
+    const plant = this.plantInFront();
+    if (plant && plant.bloomed) {
+      if (this.canTake('produce:' + plant.type)) return { id: 'harvest', at: plant, label: `Harvest ${plant.def.name}`, run: () => this.harvest(plant) };
+      return { id: 'full', at: plant, label: 'Bag full', off: true };
     }
     const wc = tc && tc.weed ? tc : own && own.weed ? own : null;
-    if (wc && !this.canTake('weed') && !(tc && tc.plant && tc.plant.bloomed)) return { id: 'fullw', at: wc.weed.mesh.position, r: 0.5, label: this.fullWhy('weed'), off: true };
-    if (wc && this.canTake('weed')) return { id: `weed${wc.i},${wc.j}`, at: wc.weed.mesh.position, r: 0.5, label: 'Pull weed', hold: 0.5, run: () => this.pullWeed(wc) };
-    if (!carry && tc && tc.placeable) {
+    if (wc && !this.canTake('weed')) return { id: 'fullw', at: wc.weed.mesh.position, r: 0.5, label: 'Bag full', off: true };
+    if (wc) return { id: `weed${wc.i},${wc.j}`, at: wc.weed.mesh.position, r: 0.5, label: 'Pull weed', hold: 0.5, run: () => this.pullWeed(wc) };
+    if (tc && tc.placeable && this.canTake('kit:' + tc.placeable.type)) {
       const pl = tc.placeable;
       // a fence is a straight wall: mark its cell; everything else is round-ish
       const mark = pl.type === 'fence' ? { at: tc, sq: true } : { at: pl.pos, r: Math.max(0.6, typeof pl.def.hit === 'number' ? pl.def.hit + 0.3 : 0.9) };
       return { id: `pack${tc.i},${tc.j}`, ...mark, label: `Pack up ${pl.def.name}`, hold: 1.0, run: () => { pl.destroy(); this.give('kit:' + pl.type); sfx('pickup'); } };
     }
-    if (carry && !this.ctx) return null;
     return null;
   }
 
-  // Why you can't take more of `kind`: holding something else, or the bag is full.
-  fullWhy(kind) { return this.carry && this.carry.kind !== kind ? 'Hands full' : 'Bag full'; }
+  // X with an item (not a tool) in your hands: what it does here. Items with no use get thrown.
+  itemUse() {
+    const [k, sub] = this.held.kind.split(':');
+    const tc = this.targetCell();
+    const plot = tc && tc.type === 'plot' ? tc : null;
+    const plant = this.plantInFront();
+    const no = (label) => ({ label, off: true });
+    switch (k) {
+      case 'seed':
+        if (plot && !plot.plant) return { at: plot, sq: true, label: `Plant ${PLANTS[sub].name}`, run: () => this.plantSeed(plot, sub) };
+        return no('Face an empty plot');
+      case 'soil':
+        if (plot && plot.soil < 3) return { at: plot, sq: true, label: `Add soil → ${SOIL[plot.soil + 1].name}`, run: () => this.addSoil(plot) };
+        return no(plot ? 'Best soil already' : 'Face a plot');
+      case 'fertilizer':
+        if (plant && (plant.stage < 4 || plant.size < plant.def.maxSize)) return { at: plant, label: `Fertilize ${plant.def.name}`, run: () => this.boost(plant, 0.25, 0.15) };
+        return no(plant ? 'Fully grown' : 'Face a plant');
+      case 'sunjar':
+        if (plant) return { at: plant, label: `Sun Jar on ${plant.def.name}`, run: () => this.boost(plant, 0.35, 0.25, true) };
+        return no('Face a plant');
+      case 'dew':
+        if (plant) return { at: plant, label: `Water ${plant.def.name}`, run: () => this.dew(plant) };
+        if (this.heartNear()) return { label: 'Water the Heart', run: () => this.dew(G.heart) };
+        return no('Face a plant');
+      case 'mulch':
+        if (!this.heartNear()) return no('Use at the Heart');
+        if (G.heart.hp >= G.heart.maxHp) return no('Heart is healthy');
+        return { label: `Mulch the Heart +${MULCH_HEAL} HP`, run: () => this.mulch() };
+      case 'kit':
+        if (canPlaceOn(tc) && !(PLACEABLES[sub].blocks && activePlayers().some((p) => G.world.cellAt(p.pos.x, p.pos.z) === tc))) {
+          return { at: tc, sq: true, label: `Place ${PLACEABLES[sub].name}`, run: () => this.place(tc, sub) };
+        }
+        return no("Can't place here");
+    }
+    return { label: 'Throw', run: () => this.throwOne() };
+  }
 
   // ── Actions ──
-  sellPrice() {
-    const c = this.carry;
-    if (!c) return 0;
-    if (c.kind.startsWith('produce:')) {
-      const t = c.kind.split(':')[1];
-      return Math.round(c.value * (G.hotItem === t ? 2 : 1));
+  // What a set of stacks sells for (produce by its size value, ×2 if it's the Hot Item).
+  priceOf(stacks) {
+    let n = 0;
+    for (const s of stacks) {
+      if (s.kind.startsWith('produce:')) n += Math.round(s.value * (G.hotItem === s.kind.slice(8) ? 2 : 1));
+      else n += sellEach(s.kind) * s.count;
     }
-    return sellEach(c.kind) * c.count;
+    return n;
   }
-  sell(at = { x: COUNTER.x, z: COUNTER.z - 1.2 }) {
-    const price = this.sellPrice();
+  sell(stacks, at = { x: COUNTER.x, z: COUNTER.z - 1.2 }) {
+    const price = this.priceOf(stacks);
     G.money += price;
     G.stats.moneyEarned += price;
     this.stats.earned += price;
-    this.stats.sold += this.carry.count;
+    for (const s of stacks) { this.stats.sold += s.count; this.removeStack(s); }
     G.fx.text({ x: at.x, y: 1.5, z: at.z }, `+$${price}`, '#ffd54f', 24);
     G.fx.burst({ x: at.x, y: 2, z: at.z }, 0xffd54f, 12, { speed: 4, emissive: true });
-    this.carry = null;
     sfx('coin');
   }
   plantSeed(tc, type) {
     const p = new Plant(type, tc);
     G.plants.push(p);
-    this.take(1);
+    this.take();
     this.stats.planted++;
     G.stats.planted++;
     G.fx.burst({ x: tc.x, y: 0.2, z: tc.z }, 0x6d4c2f, 8, { speed: 2 });
@@ -441,36 +468,46 @@ export class Player {
   addSoil(tc) {
     tc.soil++;
     G.world.refreshPlot(tc);
-    this.take(1);
+    this.take();
     G.fx.burst({ x: tc.x, y: 0.3, z: tc.z }, 0x4e342e, 12, { speed: 2.5 });
     G.fx.text(tc, SOIL[tc.soil].name + ' soil!', '#d7ccc8', 15);
     sfx('till');
   }
   boost(p, g, s, sunny = false) {
     if (p.stage < 4) p.growth = Math.min(1, p.growth + g); else p.size = Math.min(p.def.maxSize, p.size + s);
-    this.take(1);
+    this.take();
     G.fx.burst({ x: p.pos.x, y: 0.8, z: p.pos.z }, sunny ? 0xffeb3b : 0x26a69a, 16, { speed: 3, emissive: sunny });
     sfx('bloom');
   }
   mulch() {
     G.heart.hp = Math.min(G.heart.maxHp, G.heart.hp + MULCH_HEAL);
-    this.take(1);
+    this.take();
     G.fx.burst({ x: 0, y: 1.5, z: 0 }, 0xff6fa8, 24, { speed: 4 });
     G.fx.text({ x: 0, y: 3, z: 0 }, `+${MULCH_HEAL} HP`, '#ff8fc0', 20);
     sfx('bloom');
   }
+  // Water a plant or the Heart, and count it (the checklist wants a plant watered by a gnome).
+  waterIt(target, amt) {
+    target.addWater(amt);
+    this.stats.water += amt;
+    if (target !== G.heart) G.stats.plantWater += amt;
+  }
   dew(target) {
-    target.addWater(target === G.heart ? 0.2 : 0.3);
-    this.stats.water += 0.3;
-    this.take(1);
+    this.waterIt(target, target === G.heart ? 0.2 : 0.3);
+    this.take();
     G.fx.burst({ x: target.pos.x, y: 0.6, z: target.pos.z }, 0x4fc3f7, 10, { speed: 2.5 });
+    sfx('splash');
+  }
+  scoopDew() {
+    this.give('dew', this.roomFor('dew'));
+    G.fx.burst({ x: this.pos.x, y: 0.5, z: this.pos.z }, 0x4fc3f7, 12, { speed: 3 });
     sfx('splash');
   }
   place(tc, type) {
     const d = this.dir;
     const rot = Math.abs(d.x) > Math.abs(d.z) ? Math.PI / 2 : 0;
     G.placeables.push(new Placeable(type, tc, rot));
-    this.take(1);
+    this.take();
     G.fx.burst({ x: tc.x, y: 0.3, z: tc.z }, 0xc8a06a, 10, { speed: 3 });
     sfx('thump');
   }
@@ -499,15 +536,15 @@ export class Player {
     sfx('pickup');
   }
   throwOne() {
-    const it = this.take(1);
+    const it = this.take();
     if (!it) return;
     const mesh = makeItem(it.kind);
     G.scene.add(mesh);
     const d = this.dir;
     G.projectiles.push({
       kind: 'throw', item: it.kind, value: it.value, owner: this, mesh, life: 4,
-      pos: new THREE.Vector3(this.pos.x + d.x * 0.5, 2.2, this.pos.z + d.z * 0.5),
-      vel: new THREE.Vector3(d.x * 11, 5, d.z * 11),
+      pos: new THREE.Vector3(this.pos.x + d.x * 0.5, 1.2, this.pos.z + d.z * 0.5),
+      vel: new THREE.Vector3(d.x * 11, 6, d.z * 11),
     });
     sfx('throw');
   }
@@ -555,10 +592,22 @@ export class Player {
     const pressed = inp.pressed.x, held = inp.held.x;
     const tc = this.targetCell();
     // at a market stall X sells that item back instead of using your tool
+    this.use = null;
     if (this.sellAct) {
       this.xLabel = this.sellAct.label;
       this.xOff = false;
       if (pressed) this.sellAct.run();
+      this.hose.visible = false;
+      return;
+    }
+    if (tool === 'item') {
+      const u = (this.use = this.itemUse());
+      this.xLabel = u.label;
+      this.xOff = !!u.off;
+      if (pressed && this.cool <= 0) {
+        if (u.off) sfx('error');
+        else { u.run(); this.cool = 0.15; }
+      }
       this.hose.visible = false;
       return;
     }
@@ -600,7 +649,7 @@ export class Player {
           this.can -= amt;
           const p = this.plantInFront();
           const target = p || (this.heartNear() ? G.heart : null);
-          if (target) { target.addWater(amt); this.stats.water += amt; }
+          if (target) this.waterIt(target, amt);
           else if (tc && tc.type === 'plot') tc.wet = Math.min(1, tc.wet + amt);
           const tp = this.toolPos();
           const aim = target ? new THREE.Vector3(target.pos.x - tp.x, -1.2, target.pos.z - tp.z) : new THREE.Vector3(this.dir.x * 0.4, -1, this.dir.z * 0.4);
@@ -661,7 +710,7 @@ export class Player {
           sfx('water', 0.2);
           const soap = this.toolKey === 'soaphose';
           this.cone(6.5, 0.38, (e, k) => {
-            if (k === 'plant' || k === 'heart') { e.addWater(0.9 * dt); this.stats.water += 0.9 * dt; if (soap && k === 'plant' && e.mites > 0) { const r = Math.min(e.mites, 8 * dt); e.mites -= r; G.stats.mites += r; } }
+            if (k === 'plant' || k === 'heart') { this.waterIt(e, 0.9 * dt); if (soap && k === 'plant' && e.mites > 0) { const r = Math.min(e.mites, 8 * dt); e.mites -= r; G.stats.mites += r; } }
             else if (e.canBeHitBy('hose')) {
               let dm = 0.6 * dt;
               if (e.type === 'fly' || e.type === 'moth') dm = 4 * dt;
@@ -774,14 +823,22 @@ export class Player {
     const w = Math.sin(this.t * 13) * 0.6 * Math.min(1, mag);
     m.legL.rotation.x = w; m.legR.rotation.x = -w;
     m.group.position.y = Math.abs(Math.sin(this.t * 13)) * 0.06 * Math.min(1, mag);
-    // tool mesh
-    if (this.equipped !== this.toolKey) {
-      this.equipped = this.toolKey;
+    // what's in your hands: a tool in the right hand, or an item held out in front with both
+    const kind = this.held.kind;
+    const item = this.tool === 'item';
+    if (this.equipped !== kind) {
+      this.equipped = kind;
       m.tool.clear();
-      if (this.tool !== 'hands') {
+      m.carry.clear();
+      if (isTool(kind)) {
         const t = makeTool(this.toolKey);
         t.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         m.tool.add(t);
+      } else if (item) {
+        const it = makeItem(kind);
+        it.scale.setScalar(1.3);
+        it.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+        m.carry.add(it);
       }
     }
     // right arm: swing / aim / rest
@@ -790,18 +847,12 @@ export class Player {
       const p = 1 - this.swingT / 0.3;
       ra = -2.6 + Math.min(1, p * 1.4) * 3.0;
     } else if (this.streaming || this.pouring || this.tool === 'gun' || this.tool === 'mgun' || this.tool === 'slingshot' || this.tool === 'spray') ra = -1.35;
+    else if (item) ra = -1.1;
     else ra = -0.4 - w * 0.3;
     m.armR.rotation.x += (ra - m.armR.rotation.x) * Math.min(1, dt * (this.swingT > 0 ? 40 : 12));
-    // carried item over head (left arm raised)
-    const ck = this.carry ? this.carry.kind : null;
-    if (ck !== this.carryShown) {
-      this.carryShown = ck;
-      m.carry.clear();
-      if (ck) m.carry.add(makeItem(ck));
-    }
-    m.armL.rotation.x += ((ck ? -2.9 : w * 0.3) - m.armL.rotation.x) * Math.min(1, dt * 10);
-    m.lantern.visible = G.night > 0.2 && !ck;
-    m.carry.position.y = 2.3 + Math.sin(this.t * 4) * 0.04;
+    m.armL.rotation.x += ((item ? -1.1 : w * 0.3) - m.armL.rotation.x) * Math.min(1, dt * 10);
+    m.lantern.visible = G.night > 0.2 && !item;
+    m.carry.position.y = 0.72 + Math.sin(this.t * 4) * 0.03;
     m.ring.material.emissiveIntensity = 0.4 + Math.sin(this.t * 4) * 0.2;
     this.updateReticle();
   }

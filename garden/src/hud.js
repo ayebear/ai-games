@@ -3,7 +3,7 @@ import { DAY_LEN, NIGHT_LEN, PLAYER_CSS, PLAYER_NAMES, TOOLS, BAGS, PLANTS, SOIL
 import { G, activePlayers, attackedThings } from './state.js';
 import { glyphsFor, padBtn, keyBtn } from './input.js';
 import { STAGE_NAMES } from './plants.js';
-import { iconHTML } from './icons.js';
+import { iconHTML, invIconHTML } from './icons.js';
 import { sfx } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -29,14 +29,15 @@ const GOALS = [
   { text: '🌿 Pull weeds and sell them at the 💰 Quick Sell kiosk', done: (s) => s.sold > 0 },
   { text: '🌼 Buy Daisy seeds at the 🌱 Seeds shop', done: (s) => s.seeds > 0 },
   { text: '🟫 Plant them in a dug plot near the Heart', done: () => G.stats.planted > 0 },
-  { text: '💧 Water your plant with morning dew', done: (s) => s.water > 0 && G.stats.planted > 0 },
+  { text: '💧 Get dew from the drops or the pond', done: (s) => s.dew || G.stats.plantWater > 0 },
+  { text: '🌱 Water your plant', done: () => G.stats.plantWater > 0 },
 ];
 function goalSums() {
-  const s = { sold: 0, seeds: 0, water: 0 };
+  const s = { sold: 0, seeds: 0, dew: false };
   for (const p of G.slots) {
     if (!p) continue;
     s.sold += p.stats.sold;
-    s.water += p.stats.water;
+    if (p.stack('dew')) s.dew = true;
     for (const k in p.stats.bought) if (k.startsWith('seed:')) s.seeds++;
   }
   return s;
@@ -164,31 +165,25 @@ export class HUD {
     }
     el.className = `panel p${i}`;
     const g = glyphsFor(p.device);
-    const tools = p.tools.map((t, k) => `<span class="tool ${k === p.toolIdx ? 'on' : ''}" title="${TOOLS[t].name}">${t === 'hands' ? TOOLS.hands.icon : iconHTML('tool:' + t)}</span>`).join('');
-    const tool = p.tool, toolName = TOOLS[p.toolKey].name;
+    const tool = p.tool;
     let meter = '';
     if (tool === 'can') meter = this.meter('💧', p.can / p.canCap, '#4fc3f7');
     if (tool === 'spray') meter = this.meter('🧼', p.spray / SPRAY_CAP, '#f48fb1');
     if (tool === 'mgun') meter = this.meter(p.overheat ? '🔥' : '🌡️', p.heat || 0, p.overheat ? '#ff5252' : '#ffb74d');
-    const c = p.carry;
-    const carry = c ? `<div class="carry">${iconHTML(c.kind)} ${itemInfo(c.kind).name} <b>×${c.count}</b>${c.kind.startsWith('produce') ? ` <small>$${Math.round(c.value)}</small>` : ''}</div>` : `<div class="carry dim">Hands free</div>`;
+    const h = p.held;
+    const name = h.kind === 'hands' ? TOOLS.hands.name : itemInfo(h.kind).name;
+    const worth = h.kind.startsWith('produce:') ? ` <small>$${p.priceOf([h])}</small>` : '';
     const lr = p.loadRatio;
     const lcol = lr >= 1 ? '#ff5252' : lr >= 0.7 ? '#ffb74d' : '#9ccc65';
-    const slow = p.loadSlow > 0.02 ? ` <span class="slow">−${Math.round(p.loadSlow * 100)}% speed</span>` : '';
     const bagIcon = p.bag ? iconHTML('bag:' + p.bag) : '👖';
-    const load = `<div class="load">${bagIcon}<div class="bar"><i style="width:${Math.min(1, lr) * 100}%;background:${lcol}"></i></div><b class="${lr >= 1 ? 'full' : ''}">${lr >= 1 ? 'FULL' : `${p.load}/${p.capacity}`}</b></div>${slow ? `<div class="slowrow">🏋️ Heavy load${slow}</div>` : ''}`;
-    const keys = c
-      ? `<div class="keys on">${g.b} drop &nbsp; ${g.y} throw</div>`
-      : tool !== 'hands'
-        ? `<div class="keys">${p.bHold > 0.05 ? `<b class="drop">Dropping ${toolName}…</b>` : `hold ${g.b} drop ${toolName}`}</div>`
-        : `<div class="keys off">${g.b} drop &nbsp; ${g.y} throw</div>`;
+    const heavy = p.loadSlow > 0.02 ? '<span class="heavy">🏋️</span>' : '';
+    const load = `<div class="load">${bagIcon}<div class="bar"><i style="width:${Math.min(1, lr) * 100}%;background:${lcol}"></i></div><b class="${lr >= 1 ? 'full' : ''}">${lr >= 1 ? 'FULL' : `${p.load}/${p.capacity}`}</b>${heavy}</div>`;
     const leaving = p.leaveT > 0.1 ? `<div class="leave">Leaving… ${Math.round((p.leaveT / 1) * 100)}%</div>` : '';
     setHTML(el, `
       <div class="pname"><span class="dot"></span>P${i + 1} ${PLAYER_NAMES[i]} <small>${p.device.startsWith('gp') ? '🎮' : '⌨️'}</small></div>
-      <div class="tools">${g.lb}${tools}${g.rb}</div>
-      <div class="tname">${toolName}</div>
-      ${meter}${carry}${load}
-      ${keys}${leaving}`);
+      <div class="inv">${g.lb}<div class="istrip">${invStrip(p)}</div>${g.rb}</div>
+      <div class="tname">${name}${worth}</div>
+      ${meter}${load}${leaving}`);
   }
   meter(icon, f, col) {
     return `<div class="meter">${icon}<div class="bar"><i style="width:${Math.max(0, Math.min(1, f)) * 100}%;background:${col}"></i></div></div>`;
@@ -310,9 +305,9 @@ export class HUD {
         <div>🌙 Pests attack at night. Keep the <b>Heart Bloom</b> alive for ${GOAL_DAYS} days!</div>
       </div>
       <div class="keys">
-        <div><b>🎮 Gamepad</b> — Stick move · ${padBtn('a')} interact · ${padBtn('x')}/${padBtn('rt')} use tool · ${padBtn('b')} drop · ${padBtn('y')} throw · ${padBtn('lb')}${padBtn('rb')} switch tool · hold ${padBtn('start')} leave · ${padBtn('back')} pause</div>
-        <div><b>⌨️ P1</b> — WASD · Space interact · J tool · K drop · L throw · Q/E switch · Enter join (hold: leave) · Esc pause</div>
-        <div><b>⌨️ P2</b> — Arrows · . interact · , tool · / drop · ; throw · M/' switch · Right Shift join</div>
+        <div><b>🎮 Gamepad</b> — Stick move · ${padBtn('a')} interact · ${padBtn('x')}/${padBtn('rt')} use item · ${padBtn('b')} drop · ${padBtn('y')} throw · ${padBtn('lb')}${padBtn('rb')} switch item · hold ${padBtn('start')} leave · ${padBtn('back')} pause</div>
+        <div><b>⌨️ P1</b> — WASD · Space interact · J use · K drop · L throw · Q/E switch · Enter join (hold: leave) · Esc pause</div>
+        <div><b>⌨️ P2</b> — Arrows · . interact · , use · / drop · ; throw · M/' switch · Right Shift join</div>
       </div>`);
   }
 
@@ -363,6 +358,21 @@ export class HUD {
       <div class="pcs">${cards}</div>
       <div class="go">${victory ? `Press ${padBtn('y')} / ${keyBtn('L')} to keep playing (endless) · ` : ''}Press ${padBtn('a')} / ${keyBtn('Space')} for a new garden</div>`);
   }
+}
+
+// The inventory strip: the stack in your hands and its neighbors, turning like a carousel so the one
+// in your hands is always in the middle (and bigger). Counts sit tight against the icon: "5×🌿".
+const INV_SHOWN = 3;
+function invStrip(p) {
+  const n = p.inv.length, m = Math.min(n, INV_SHOWN);
+  const start = p.sel - Math.floor((m - 1) / 2);
+  let out = '';
+  for (let k = 0; k < m; k++) {
+    const idx = (((start + k) % n) + n) % n;
+    const s = p.inv[idx];
+    out += `<span class="islot${idx === p.sel ? ' on' : ''}">${s.count > 1 ? `<i class="q">${s.count}×</i>` : ''}${invIconHTML(s.kind)}</span>`;
+  }
+  return out;
 }
 
 // Per-player shopping receipt: every item bought, how many, and what it cost.
