@@ -25,7 +25,23 @@ export const G = {
   heart: null,
   boss: null,
   stats: null,
+  market: null,
+  clock: 0, // seconds of unpaused play; used to remember what was attacked recently
+  // the Trading Post coin jar, as a camera/alert target when raccoons rob it
+  jar: { pos: { x: 0, z: -17.6 }, kind: 'jar', dead: false, attackedAt: -99 },
 };
+
+// Things the gardeners own that enemies hit in the last few seconds. The camera keeps them in view.
+export const ATTACK_MEMORY = 3;
+export function attackedThings() {
+  const recent = (o) => o && !o.dead && o.attackedAt != null && G.clock - o.attackedAt < ATTACK_MEMORY;
+  const out = [];
+  for (const p of G.plants) if (recent(p)) out.push(p);
+  for (const p of G.placeables) if (recent(p)) out.push(p);
+  if (recent(G.heart)) out.push(G.heart);
+  if (recent(G.jar)) out.push(G.jar);
+  return out;
+}
 
 export const activePlayers = () => G.slots.filter((p) => p && p.active);
 

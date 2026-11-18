@@ -125,7 +125,7 @@ export class Enemy {
     if (this.type === 'mole') this.state = 'tunnel';
     if (this.type === 'crow') this.state = 'startle';
     const { x, z } = this.pos;
-    if (Math.abs(x) > Math.abs(z)) this.exit = { x: Math.sign(x || 1) * 42, z };
+    if (Math.abs(x) > Math.abs(z) || z < 0) this.exit = { x: Math.sign(x || 1) * 42, z }; // not north through the market
     else this.exit = { x, z: Math.sign(z || 1) * 42 };
   }
 
@@ -375,6 +375,7 @@ export class Enemy {
         this.timer = 0.6;
         const amt = Math.min(G.money, 1 + Math.floor(G.day / 10));
         G.money -= amt; this.stolen += amt;
+        G.jar.attackedAt = G.clock;
         G.stats.moneyStolen += amt;
         G.fx.text(this.pos, `-$${amt}`, '#ff5252', 15);
         sfx('steal');
@@ -455,11 +456,10 @@ export class Enemy {
 // ───────────────────────── Director: spawns waves ─────────────────────────
 function edgeSpawn() {
   for (let k = 0; k < 20; k++) {
-    const side = Math.floor(Math.random() * 4);
+    const side = 1 + Math.floor(Math.random() * 3); // never the north edge: that's the market
     const t = rand(-HALF + 3, HALF - 3);
     const e = HALF - 1.2;
     const [x, z] = side === 0 ? [t, -e] : side === 1 ? [t, e] : side === 2 ? [-e, t] : [e, t];
-    if (side === 0 && Math.abs(x) < 9) continue; // not through the shop
     if (Math.hypot(x - -19.5, z - 19.5) < 7) continue; // not out of the pond
     return [x, z];
   }

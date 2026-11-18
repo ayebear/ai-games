@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { DAY_LEN, NIGHT_LEN, PLAYER_CSS, PLAYER_NAMES, TOOLS, PLANTS, SOIL, ENEMIES, GOAL_DAYS, itemInfo, CAN_CAP, SPRAY_CAP } from './config.js';
-import { G, activePlayers } from './state.js';
+import { G, activePlayers, attackedThings } from './state.js';
 import { glyphsFor, padBtn, keyBtn } from './input.js';
-import { renderShop } from './shop.js';
 import { STAGE_NAMES } from './plants.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,14 +24,16 @@ export class HUD {
     this.prompts = [0, 1, 2, 3].map(() => this.mk('prompt'));
     this.cards = [0, 1, 2, 3].map(() => this.mk('pcard'));
     this.badges = new Map();
+    this.alarms = new Map(); // ⚠️ markers over attacked gadgets / heart / coin jar
   }
   mk(cls) { const el = document.createElement('div'); el.className = cls; el.style.display = 'none'; this.labels.appendChild(el); return el; }
 
-  project(pos, y, el) {
+  // below = hang the element under the point instead of above it
+  project(pos, y, el, below = false) {
     v.set(pos.x, y, pos.z).project(G.camera);
     if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) { el.style.display = 'none'; return; }
     el.style.display = '';
-    el.style.transform = `translate(-50%,-100%) translate(${((v.x + 1) / 2) * innerWidth}px, ${((1 - v.y) / 2) * innerHeight}px)`;
+    el.style.transform = `translate(-50%,${below ? '12px' : '-100%'}) translate(${((v.x + 1) / 2) * innerWidth}px, ${((1 - v.y) / 2) * innerHeight}px)`;
   }
 
   update() {
@@ -76,7 +77,6 @@ export class HUD {
     }
     el.className = `panel p${i}`;
     const g = glyphsFor(p.device);
-    if (p.shop) { setHTML(el, renderShop(p)); return; }
     const tools = p.tools.map((t, k) => `<span class="tool ${k === p.toolIdx ? 'on' : ''}" title="${TOOLS[t].name}">${TOOLS[t].icon}</span>`).join('');
     const tool = p.tool;
     let meter = '';
@@ -112,7 +112,20 @@ export class HUD {
     for (let i = 0; i < 4; i++) {
       const p = G.slots[i];
       const pr = this.prompts[i], card = this.cards[i];
-      if (!playing || G.state === 'paused' || !p || !p.active || p.shop) { pr.style.display = 'none'; card.style.display = 'none'; continue; }
+      if (!playing || G.state === 'paused' || !p || !p.active) { pr.style.display = 'none'; card.style.display = 'none'; continue; }
+      // browsing a market stall: one card over the stall with buy / sell prompts
+      if (p.ctx && p.ctx.stall) {
+        pr.style.display = 'none';
+        const st = p.ctx.stall;
+        const stacked = [...shown].filter((o) => o === st).length;
+        shown.add(st);
+        setHTML(card, G.market.cardHTML(p, st).replace('class="stall"', `class="stall" data-k="${stacked}"`));
+        card.style.setProperty('--pc', PLAYER_CSS[i]);
+        // browsing from behind the stall (north side)? hang the card below it so it doesn't hide your gnome
+        if (p.pos.z < st.pos.z - 0.5) this.project(st.pos, -stacked * 2.2, card, true);
+        else this.project(st.pos, 3.0 + stacked * 1.6, card);
+        continue;
+      }
       const g = glyphsFor(p.device);
       const parts = [];
       if (p.ctx) {
@@ -140,13 +153,26 @@ export class HUD {
       if (shown.has(pl)) { if (el) el.style.display = 'none'; continue; }
       if (!el) { el = this.mk('badge'); this.badges.set(pl, el); }
       let alert = '';
-      if (pl.mites >= 1) alert = '🐛';
+      if (G.clock - (pl.attackedAt ?? -99) < 1.5) alert = '⚔️';
+      else if (pl.mites >= 1) alert = '🐛';
       else if (pl.hp < pl.maxHp * 0.4) alert = '💔';
       else if (pl.water < 0.15) alert = '💧';
       else if (pl.water > 1.0) alert = '🌊';
       const main = pl.bloomed ? ring(pl.def.icon, 1, '#ffd54f', 'ready') : ring(pl.def.icon, pl.growth, '#9ccc65');
       setHTML(el, `<div class="mini">${main}${alert ? `<div class="alert"><span>${alert}</span></div>` : ''}</div>`);
       this.project(pl.pos, pl.topY + 0.5, el);
+    }
+    // alarm markers over attacked non-plant things
+    const hot = new Set(G.state === 'playing' ? attackedThings().filter((t) => t.kind !== 'plant') : []);
+    for (const [t, el] of this.alarms) if (!hot.has(t)) { el.remove(); this.alarms.delete(t); }
+    for (const t of hot) {
+      let el = this.alarms.get(t);
+      if (!el) {
+        el = this.mk('badge');
+        el.innerHTML = `<div class="alarm">⚠️ <span>${t.kind === 'jar' ? 'Coin jar!' : t.kind === 'heart' ? 'Heart Bloom!' : t.def?.name ?? ''}</span></div>`;
+        this.alarms.set(t, el);
+      }
+      this.project(t.pos, t.kind === 'heart' ? 5.5 : 2.6, el);
     }
   }
 
@@ -185,8 +211,8 @@ export class HUD {
       <div class="slots">${slots}</div>
       <div class="go ${any ? '' : 'dim'}">${any ? `Press ${padBtn('a')} / ${keyBtn('Space')} to begin!` : `Press ${padBtn('start')} on a controller (or ${keyBtn('Enter')} / ${keyBtn('R-Shift')}) to join`}</div>
       <div class="how">
-        <div>🌿 <b>Start with nothing.</b> Pull weeds &amp; grab junk, sell them at the shop counter.</div>
-        <div>🌱 <b>Buy seeds</b>, plant them in plots, water with morning dew, harvest &amp; sell.</div>
+        <div>🌿 <b>Start with nothing.</b> Pull weeds &amp; grab junk, sell them at the Quick Sell counter.</div>
+        <div>🌱 <b>Walk the market</b>: every stall is an item. ${padBtn('a')} buys, ${padBtn('x')} sells it back. Plant seeds in plots, water with morning dew, harvest &amp; sell.</div>
         <div>💧 <b>Proper care</b> = water in the blue zone, sun, rich soil → bigger plants, more money.</div>
         <div>🌙 <b>Every night is a round.</b> Pests attack. Protect the <b>Heart Bloom</b> or it's game over.</div>
       </div>

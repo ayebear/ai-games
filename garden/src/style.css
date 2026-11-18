@@ -78,26 +78,22 @@ body { font-family: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif
 .keys .drop { color: #ffb74d; }
 #top .pausehint { font-size: 11px; opacity: 0.7; display: flex; align-items: center; gap: 2px; }
 #top .pausehint .btn { font-size: 10px; }
-.shop .row .pr .gain { color: #9ccc65; }
 .leave { color: #ff8a80; font-weight: 700; margin-top: 3px; }
 
-/* ── Shop ── */
-.shop .tabs { display: flex; gap: 4px; justify-content: space-between; }
-.shop .tabs span { flex: 1; text-align: center; padding: 3px 0; border-radius: 8px; background: rgba(255, 255, 255, 0.08); font-size: 16px; opacity: 0.5; }
-.shop .tabs span.on { background: var(--pc); opacity: 1; }
-.shop .tabname { text-align: center; font-weight: 700; margin: 5px 0; font-size: 14px; }
-.shop .tabname b { font-size: 10px; opacity: 0.6; }
-.shop .row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; font-size: 12.5px; border-radius: 8px; border: 2px solid transparent; }
-.shop .row .ic { width: 20px; text-align: center; }
-.shop .row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shop .row .pr { color: #ffd54f; font-weight: 700; }
-.shop .row.no { opacity: 0.55; }
-.shop .row.owned .pr { color: #a5d6a7; }
-.shop .row.locked .pr { color: #aaa; font-size: 11px; }
-.shop .row.sel { border-color: var(--pc); background: rgba(255, 255, 255, 0.14); opacity: 1; }
-.shop .desc { margin-top: 6px; font-size: 12px; min-height: 32px; opacity: 0.9; line-height: 1.3; }
-.shop .desc .why { color: #ffab91; font-weight: 600; }
-.shop .hint { margin-top: 4px; font-size: 11px; opacity: 0.6; text-align: center; }
+/* ── Market stall card (floats over the stall you're browsing) ── */
+.stall { width: 230px; background: rgba(12, 16, 12, 0.88); border: 2px solid var(--pc, #fff); border-top: 5px solid var(--sc); border-radius: 12px; padding: 7px 10px; color: #fff; font-size: 12px; line-height: 1.35; }
+.stall .sh { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.stall .si { font-size: 20px; }
+.stall .sh b { flex: 1; }
+.stall .sp { color: #ffd54f; font-weight: 800; font-size: 15px; }
+.stall .sp.no { color: #ff8a65; }
+.stall .sd { opacity: 0.85; margin: 3px 0 5px; }
+.stall .sa { display: flex; align-items: center; gap: 6px; font-weight: 700; margin-top: 3px; }
+.stall .sa.no { color: #ffab91; }
+.stall .sa.sell { color: #c5e1a5; }
+.stall .sa.hint { font-weight: 400; opacity: 0.7; font-size: 11px; }
+.alarm { background: #3a0d0d; border: 2px solid #ff5252; color: #fff; border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700; white-space: nowrap; animation: bob 0.8s ease-in-out infinite; }
+.alarm span { font-size: 11px; }
 
 /* ── World labels ── */
 #labels { position: absolute; inset: 0; overflow: hidden; }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALF, COUNTER, SPIGOT, POND, MAX_PLAYERS } from './config.js';
+import { HALF, SPIGOT, POND, MAX_PLAYERS } from './config.js';
 import { P, mat, glow, SPH, BOX, CYL, CONE, ICO, DISC, PLANE } from './models.js';
 
 export function createScene(container) {
@@ -78,7 +78,7 @@ export function createScene(container) {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
     for (let i = 0; i < N; i++) {
       const x = (Math.random() - 0.5) * 56, z = (Math.random() - 0.5) * 56;
-      if (Math.hypot(x, z) < 3) { i--; continue; }
+      if (Math.hypot(x, z) < 3 || z < -15.8) { i--; continue; } // not on the heart or the market floor
       p.set(x, 0, z);
       e.set((Math.random() - 0.5) * 0.4, Math.random() * 6, (Math.random() - 0.5) * 0.4);
       q.setFromEuler(e);
@@ -115,36 +115,8 @@ export function createScene(container) {
     for (const im of [trunks, pines, rounds]) { im.castShadow = true; scene.add(im); }
   }
 
-  // ── Shop ──
+  // ── Spigot (the market itself is built in market.js) ──
   {
-    const shop = new THREE.Group();
-    shop.position.set(0, 0, -22);
-    P(shop, BOX(), mat(0xf3e5c8), [0, 2, 0], [11, 4, 6.5]);
-    P(shop, BOX(), mat(0xb34a3a), [0, 4.4, 0], [12, 0.6, 7.5]);
-    const roof = P(shop, CONE(4), mat(0xc0564a, { flat: true }), [0, 5.8, 0], [8.5, 2.4, 5.5], [0, Math.PI / 4, 0]);
-    roof.scale.set(8.6, 2.4, 6);
-    P(shop, BOX(), mat(0x8d6e4b), [0, 1.1, 3.7], [8, 1.1, 1.1]); // counter
-    P(shop, BOX(), mat(0xa1887f), [0, 1.7, 3.7], [8.2, 0.12, 1.3]);
-    // awning stripes
-    for (let i = 0; i < 8; i++) P(shop, BOX(), mat(i % 2 ? 0xffffff : 0x43a047), [-4.4 + i * 1.25 + 0.6, 3.4, 4.2], [1.25, 0.12, 1.6], [0.35, 0, 0]);
-    P(shop, BOX(), mat(0x5d4037), [-4.5, 1.7, 4.1], [0.15, 3.4, 0.15]);
-    P(shop, BOX(), mat(0x5d4037), [4.5, 1.7, 4.1], [0.15, 3.4, 0.15]);
-    // sign
-    P(shop, BOX(), mat(0x3e2723), [0, 5.0, 3.5], [4.5, 1.1, 0.2]);
-    const signTex = makeTextTexture('GARDEN SHOP', '#ffe082', '#3e2723');
-    P(shop, PLANE(), new THREE.MeshBasicMaterial({ map: signTex, toneMapped: false }), [0, 5.0, 3.62], [4.3, 0.95, 1], [0, 0, 0], false);
-    // coin jar on the counter
-    P(shop, CYL(12), mat(0xe0f7fa, { transparent: true, opacity: 0.45, roughness: 0.05 }), [0, 2.15, 3.7], [0.35, 0.8, 0.35]);
-    P(shop, CYL(12), glow(0xffd54f, 0.4), [0, 2.0, 3.7], [0.3, 0.45, 0.3]);
-    // crates & sacks decoration
-    P(shop, BOX(), mat(0xc8a06a), [-6.2, 0.5, 2.8], [1, 1, 1]);
-    P(shop, BOX(), mat(0xc8a06a), [-6.3, 1.4, 2.6], [0.8, 0.8, 0.8], [0, 0.4, 0]);
-    P(shop, SPH(10, 8), mat(0xd7ccc8), [6.0, 0.5, 2.9], [0.6, 0.55, 0.5]);
-    // window
-    P(shop, BOX(), mat(0x81d4fa, { roughness: 0.1 }), [-3.5, 2.6, 3.27], [1.6, 1.0, 0.05]);
-    P(shop, BOX(), mat(0x81d4fa, { roughness: 0.1 }), [3.5, 2.6, 3.27], [1.6, 1.0, 0.05]);
-    shop.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
-    scene.add(shop);
     // spigot
     const sp = new THREE.Group();
     sp.position.set(SPIGOT.x, 0, SPIGOT.z);
@@ -219,7 +191,7 @@ export function createScene(container) {
   return { renderer, scene, camera, sun, hemi, stars, rain, fireflies, lampLights, playerLights, heartLight };
 }
 
-function makeTextTexture(text, fg, bg) {
+export function makeTextTexture(text, fg, bg) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 112;
   const x = cv.getContext('2d');

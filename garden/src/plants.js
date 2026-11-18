@@ -13,6 +13,7 @@ export function sunAt(x, z) {
   return s;
 }
 
+export const PLANT_SCALE = 1.55;
 const stageOf = (g) => (g < 0.12 ? 0 : g < 0.32 ? 1 : g < 0.62 ? 2 : g < 1 ? 3 : 4);
 export const STAGE_NAMES = ['Seed', 'Sprout', 'Growing', 'Budding', 'Bloom'];
 
@@ -133,8 +134,9 @@ export class Plant {
   animate(dt) {
     const m = this.model;
     const grow01 = this.stage === 4 ? 1 : clamp((this.growth - [0, 0.12, 0.32, 0.62][this.stage]) / [0.12, 0.2, 0.3, 0.38][this.stage], 0, 1);
-    let s = 0.75 + grow01 * 0.25;
-    if (this.type !== 'pumpkin') s *= 1 + (this.size - 1) * 0.45;
+    // PLANT_SCALE makes everything chunkier; young plants get an extra boost so they read at a glance.
+    let s = (0.75 + grow01 * 0.25) * PLANT_SCALE * (this.stage <= 1 ? 1.2 : 1);
+    if (!this.def.bigFruit) s *= 1 + (this.size - 1) * 0.45;
     this.bite = Math.max(0, this.bite - dt);
     const squash = this.bite > 0 ? 1 + Math.sin(this.bite * 40) * 0.06 : 1;
     this.root.scale.set(s * squash, s / squash, s * squash);
@@ -155,6 +157,7 @@ export class Plant {
 
   damage(n, src = null, dt = 0) {
     if (this.dead) return;
+    this.attackedAt = G.clock;
     this.hp -= n;
     this.bite = 0.25;
     if (this.def.thorns && this.stage >= 2 && src && src.hit && dt > 0) src.hit(this.def.thorns * dt, null, 0, 0, true);
@@ -231,6 +234,7 @@ export class Heart {
 
   damage(n, src = null) {
     if (this.dead) return;
+    this.attackedAt = G.clock;
     // the ancient bloom shrugs off small pests; big beasts hurt it for real
     const big = src && (src.type === 'deer' || src.type === 'stag' || src.type === 'raccoon');
     this.hp -= big ? n : n * 0.5;

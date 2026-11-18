@@ -33,8 +33,8 @@ hungry creatures come for your plants. Survive as many nights as you can. The go
 | Leave | **Hold Start** (1 s) | Hold Enter | Hold Right Shift |
 | Move | Left stick / D-pad | WASD | Arrows |
 | Aim (optional) | Right stick | — | — |
-| Interact (pick up, plant, harvest, sell, shop) | **A** | Space | . (period) |
-| Use tool | **X** (hold for streams) | J | , (comma) |
+| Interact (pick up, plant, harvest, quick sell, **buy at a stall**) | **A** | Space | . (period) |
+| Use tool · **sell back at a stall** | **X** (hold for streams) | J | , (comma) |
 | Drop carried stack | **B** | K | / |
 | Drop equipped tool (share it) | **Hold B** (hands empty) | Hold K | Hold / |
 | Throw one carried item | **Y** | L | ; |
@@ -51,7 +51,7 @@ hungry creatures come for your plants. Survive as many nights as you can. The go
 
 ```
  DAY  ──────────────────────────────────────────────────────────►  DUSK
- collect dew · pull weeds · sell · shop · plant · water · harvest   shop closes
+ collect dew · pull weeds · sell · browse market · plant · water · harvest   market closes
  light pests: flies, crows, mites, moles                            prep defenses
                                                                        │
  DAWN ◄────────────────────────────────────────────────────────── NIGHT (the round)
@@ -70,7 +70,7 @@ hungry creatures come for your plants. Survive as many nights as you can. The go
 
 You start with **$0, bare hands, and an overgrown garden**:
 
-- **Weeds** are everywhere. Hold Interact to pull one. Weeds sell for $1 at the shop counter, or
+- **Weeds** are everywhere. Hold Interact to pull one. Weeds sell for $1 at the Quick Sell counter, or
   can be fed to a Compost Bin later.
 - **Old junk** (boots, cans) is lying around and sells for $3.
 - A few **lost coins** sparkle in the grass.
@@ -103,19 +103,48 @@ reach ×4.5.
 
 | Plant | Seed | Grow | Base value | Special |
 |---|---|---|---|---|
-| 🌼 Daisy | $3 | fast | $9 | Hardy starter crop |
-| 🏵️ Marigold | $6 | fast | $13 | **Aura:** repels flies and kills mites nearby |
-| 🍅 Tomato | $10 | medium | $7 | **Fruits again** after harvest; tomatoes can be **thrown** at pests |
-| 🌻 Sunflower | $14 | slow | $30 | Sun-hungry; harvest also drops a free **Sun Jar** |
-| 🪴 Flytrap | $18 | medium | $12 | **Eats** flies and moths that come close (a living turret) |
-| 🌹 Rose | $24 | slow | $45 | **Thorns** hurt anything that chews on it |
-| 🎃 Giant Pumpkin | $40 | very slow | $80 | Thirsty; grows **enormous** (×4.5) |
+| 🌼 Daisy | $3 | fast | $27 | Hardy starter crop |
+| 🍓 Strawberry | $5 | fast | $22 | **Fruits again** after harvest |
+| 🏵️ Marigold | $6 | fast | $50 | **Aura:** repels flies and kills mites nearby |
+| 🥕 Carrot | $8 | medium | $72 | Sturdy, reliable money |
+| 🍅 Tomato | $10 | medium | $45 | **Fruits again** after harvest; tomatoes can be **thrown** at pests |
+| 🌻 Sunflower | $14 | slow | $125 | Sun-hungry; harvest also drops a free **Sun Jar** |
+| 🪴 Flytrap | $18 | medium | $150 | **Eats** flies and moths that come close (a living turret) |
+| 🌽 Corn | $20 | slow | $180 | Tall and sun-loving |
+| 🌹 Rose | $24 | slow | $220 | **Thorns** hurt anything that chews on it |
+| 🍉 Watermelon | $32 | slow | $290 | Thirsty; the melon swells up to ×3.2 |
+| 🎃 Giant Pumpkin | $40 | very slow | $360 | Thirsty; grows **enormous** (×4.5) |
 
-**Market:** each morning one crop is the **Hot Item** and sells for ×2.
+**Market:** each morning one crop is the **Hot Item** and sells for ×2 (its seed stall's board says 🔥 HOT).
+Bloom values are roughly **9× the seed price** at size ×1, and size multiplies that, so big crops scale hard.
+Regrowing crops (Tomato, Strawberry) pay about half that per harvest but keep fruiting.
 
 ---
 
-## 5. Tools & Weapons (bought per player; separate Tools and Weapons tabs in the shop)
+## 4b. The Market (walk-in store)
+
+There are no shop menus. The north strip of the garden is a **market street**: every item has its own
+**stall** with a 3D display and a chalkboard price (red when you can't afford it, a tarp when it isn't
+unlocked yet, SOLD for owned upgrades). Walk up to a stall and a card shows what it does.
+
+- **A buys** one. **X sells that item back** right there: a seed stall also buys that plant's produce,
+  gadget and supply stalls buy back their kits and supplies (half price), tool stalls buy back your tool.
+- Sections: Seeds and Supplies along the back, Garden gadgets on the back right; Tools, Weapons and
+  Upgrades along the front row, which has gaps so you can walk in from the garden.
+- **Quick Sell counter** (the Trading Post) at the front center buys *anything*, so you never have to go
+  inside just to dump weeds and junk. It also holds the coin jar raccoons are after.
+- **Sell Stand** gadget ($150): your own quick-sell spot anywhere in the garden.
+- **At dusk the market closes**: anyone inside is moved to the front entrance and the aisles are roped
+  off until dawn (the Quick Sell counter stays open).
+
+## 4c. Camera
+
+The shared camera frames every gnome **and anything you own that is under attack** (plants, the Heart
+Bloom, gadgets, the coin jar), zooming out as far as needed. Attacked things get a ⚔️/⚠️ marker.
+
+---
+
+## 5. Tools & Weapons (bought per player at the Tools and Weapons stalls)
 
 | Tool | Cost | Uses |
 |---|---|---|
@@ -134,6 +163,7 @@ reach ×4.5.
 | Gadget | Cost | What it does | Catch / combo |
 |---|---|---|---|
 | 🧱 Fence | $5 | Blocks deer, raccoons (and you) | Slugs slip under; deer chew through |
+| 🏷️ Sell Stand | $150 | A quick-sell spot in your garden: sell anything there | Pricey, but saves trips |
 | 👒 Scarecrow | $25 | Crows won't land within 8 m | — |
 | 💡 Sun Lamp | $30 | Sunlight at night, so plants **grow at night** · **deer avoid light** | **Attracts moths**, which attack it |
 | ⛲ Sprinkler | $35 | Waters everything nearby every few seconds | Wet soil **lures slugs**; can make plants soggy |
@@ -155,7 +185,7 @@ reach ×4.5.
 ## 8. The Bag (inventory) & Selling
 
 - You carry **one stack of one item type**. Its size is limited by your bag's **capacity in weight**:
-  most items weigh 1, **Soil Bags and gadget kits weigh 2**, and **Giant Pumpkins weigh 3**.
+  most items weigh 1, **Soil Bags and gadget kits weigh 2**, and **Giant Pumpkins and Watermelons weigh 3**.
 - Every player panel shows a **load meter** (`12/16`, turning orange then a flashing red **FULL**).
 - **Heavy loads slow you down**, up to −30 % speed when the bag is full. That's the trade-off
   between one big haul to the counter and several quick trips.
@@ -192,7 +222,7 @@ Each enemy has a counter, a "weird trick", and drops coins when defeated.
 | 🐌 **Slug** | Slow, tough, **attracted to wet soil** | Shovel, Soap, Beer Trap |
 | 🦋 **Moth** | Drawn to **lamps** and attacks them | Swatter, Zapper, Flytrap |
 | 🦌 **Deer** | Big, hungry, eats fast. **Afraid of light**, blocked by fences (but chews through) | Spud Gun, Fence, Sun Lamp, Sun Jar flash, Bright Lanterns |
-| 🦝 **Raccoon** | Ignores plants and goes for your **coin jar** at the shop! Hit it and it drops what it stole | Anything; fence off the counter |
+| 🦝 **Raccoon** | Ignores plants and goes for your **coin jar** at the Quick Sell counter! Hit it and it drops what it stole | Anything; fence off the counter |
 | 🌙 **Moon Stag** (boss, every 10th night) | Huge, heads straight for the Heart Bloom, smashes fences, charges and bowls over gnomes, calls deer | Everything you've got |
 
 **Difficulty curve:** night waves are budget-based (budget grows with day number and player

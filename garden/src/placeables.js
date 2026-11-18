@@ -96,6 +96,7 @@ export class Placeable {
 
   damage(n) {
     if (this.dead) return;
+    this.attackedAt = G.clock;
     this.hp -= n;
     if (this.hitT <= 0) {
       this.hitT = 0.4;

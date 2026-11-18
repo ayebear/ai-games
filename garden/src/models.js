@@ -45,7 +45,10 @@ const grp = (parent, pos = [0, 0, 0], rot = [0, 0, 0]) => {
 
 const GREEN = 0x4caf50, DGREEN = 0x2e7d32, STEM = 0x5b9a3c, BROWN = 0x6d4c2f, SKIN = 0xf6c9a4;
 const WOOD = 0x9a6a3a, METAL = 0x9aa3ab;
-export const PLANT_COLORS = { daisy: 0xffffff, marigold: 0xff9a1f, tomato: 0xe8302a, sunflower: 0xffd21f, flytrap: 0x7bc043, rose: 0xd8173a, pumpkin: 0xff7a1a };
+export const PLANT_COLORS = {
+  daisy: 0xffffff, strawberry: 0xe5303f, marigold: 0xff9a1f, carrot: 0xff8a1f, tomato: 0xe8302a, sunflower: 0xffd21f,
+  flytrap: 0x7bc043, corn: 0xf5d142, rose: 0xd8173a, watermelon: 0x3f9a3a, pumpkin: 0xff7a1a,
+};
 
 // ───────────────────────── Gnome (player) ─────────────────────────
 export function makeGnome(color) {
@@ -252,6 +255,58 @@ export function makePlantModel(type, stage) {
       out.height = 1.0;
       break;
     }
+    case 'strawberry': {
+      for (let i = 0; i < 7; i++) P(g, SPH(8, 6), mat(i % 2 ? 0x3f8f3a : 0x4fa646, { flat: true }), [Math.cos(i * 0.9) * 0.24, 0.12 + (i % 3) * 0.06, Math.sin(i * 0.9) * 0.24], [0.17, 0.08, 0.15], [0, i, 0]);
+      if (stage === 3) for (let i = 0; i < 4; i++) P(g, ICO(0), mat(0xffffff, { flat: true }), [Math.cos(i * 1.6 + 0.4) * 0.28, 0.3, Math.sin(i * 1.6 + 0.4) * 0.28], 0.06);
+      if (stage === 4) {
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.05 + 0.3;
+          const b = grp(g, [Math.cos(a) * 0.32, 0.22, Math.sin(a) * 0.32], [Math.PI + Math.cos(a) * 0.4, 0, Math.sin(a) * 0.4]);
+          P(b, CONE(8), mat(0xe5303f, { roughness: 0.45 }), [0, 0.06, 0], [0.08, 0.15, 0.08]);
+          P(b, CONE(5), mat(0x3f8f3a), [0, -0.03, 0], [0.07, 0.03, 0.07], [Math.PI, 0, 0]);
+        }
+      }
+      out.height = stage === 4 ? 0.45 : 0.35;
+      break;
+    }
+    case 'carrot': {
+      const n = [0, 0, 4, 6, 8][stage], h = [0, 0, 0.35, 0.5, 0.65][stage];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        P(g, CONE(5), mat(i % 2 ? 0x5fb83a : 0x4a9a32, { flat: true }), [Math.cos(a) * 0.07, h / 2, Math.sin(a) * 0.07], [0.07, h, 0.07], [Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35]);
+      }
+      if (stage === 4) P(g, CONE(10), mat(0xff8a1f), [0, 0.02, 0], [0.16, 0.22, 0.16], [Math.PI, 0, 0]);
+      out.height = h + 0.15;
+      break;
+    }
+    case 'corn': {
+      const h = [0, 0, 0.9, 1.5, 2.0][stage];
+      stem(g, h, 0.06, 0x7aa83a);
+      for (let i = 0; i < 5; i++) leaf(g, 0.2 + i * h * 0.16, 0.6, i * 2.3, 0.55, i % 2 ? 0x6aa83a : 0x5a9a32);
+      if (stage >= 3) P(g, CONE(6), mat(stage === 4 ? 0xd9b65a : 0xb8c86a), [0, h + 0.12, 0], [0.08, 0.3, 0.08]);
+      if (stage === 4) {
+        for (const s of [-1, 1]) {
+          const cob = grp(g, [s * 0.1, h * 0.55, 0.04], [0, 0, s * -0.35]);
+          P(cob, CYL(8), mat(0xf5d142, { roughness: 0.5 }), [0, 0.12, 0], [0.07, 0.28, 0.07]);
+          P(cob, CONE(6), mat(0x8bc34a), [0, 0.07, 0], [0.09, 0.3, 0.09]);
+        }
+      }
+      out.height = h + 0.3;
+      break;
+    }
+    case 'watermelon': {
+      for (let i = 0; i < 6; i++) leaf(g, 0.05, 0.55, i * 1.05 + 0.2, -0.15, i % 2 ? 0x4a8a3a : 0x3f7f34);
+      if (stage >= 3) {
+        const fruit = grp(g, [0.1, 0, 0.15]);
+        const ripe = stage === 4;
+        const r = ripe ? 0.38 : 0.16;
+        P(fruit, SPH(14, 10), mat(ripe ? 0x3f9a3a : 0x8bc34a, { roughness: 0.4 }), [0, r * 0.7, 0], [r * 1.3, r * 0.75, r]);
+        if (ripe) for (let i = 0; i < 5; i++) P(fruit, SPH(10, 8), mat(0x1f5f22, { roughness: 0.4 }), [0, r * 0.7, 0], [r * 1.31, r * 0.755, r * 0.18], [i * 0.62, 0, 0]);
+        out.fruit = fruit;
+      }
+      out.height = stage === 4 ? 0.7 : 0.4;
+      break;
+    }
     case 'pumpkin': {
       for (let i = 0; i < 5; i++) leaf(g, 0.05, 0.7, i * 1.25 + 0.3, -0.1, 0x4a8a3a);
       if (stage >= 3) {
@@ -421,6 +476,16 @@ export function makePlaceable(type) {
       P(g, BOX(), mat(0xb08850), [0, 0.45, 0], [1.9, 0.14, 0.08]);
       P(g, BOX(), mat(0xb08850), [0, 0.95, 0], [1.9, 0.14, 0.08]);
       break;
+    case 'sellbox':
+      // little wooden market cart: crate counter, striped canopy, coin pile and a price tag
+      P(g, BOX(), mat(0xb08850), [0, 0.45, 0], [1.4, 0.9, 1.0]);
+      P(g, BOX(), mat(0x8d6e4b), [0, 0.93, 0], [1.5, 0.08, 1.1]);
+      for (const x of [-0.68, 0.68]) P(g, CYL(6), mat(WOOD), [x, 1.45, -0.4], [0.04, 1.1, 0.04]);
+      for (let i = 0; i < 4; i++) P(g, BOX(), mat(i % 2 ? 0xffffff : 0xe6a817), [-0.54 + i * 0.36, 2.0, -0.15], [0.36, 0.06, 0.8], [0.3, 0, 0]);
+      for (let i = 0; i < 5; i++) P(g, CYL(10), mat(0xffd54f, { metalness: 0.7, roughness: 0.3, emissive: 0x553300 }), [0.35 + (i % 2) * 0.05, 1.0 + i * 0.05, 0.1], [0.12, 0.04, 0.12]);
+      P(g, BOX(), mat(0xfff3c4), [-0.35, 1.15, 0.2], [0.35, 0.22, 0.03], [0, 0, 0.3]);
+      P(g, SPH(6, 4), mat(0xd84336), [-0.48, 1.2, 0.22], 0.03);
+      break;
     case 'scarecrow':
       P(g, CYL(6), mat(WOOD), [0, 1.1, 0], [0.06, 2.2, 0.06]);
       P(g, BOX(), mat(WOOD), [0, 1.55, 0], [1.4, 0.08, 0.08]);
@@ -532,6 +597,17 @@ export function makeItem(kind) {
       } else if (sub === 'flytrap') {
         P(g, HEMI(), mat(0x7bc043), [0, 0.1, 0], [0.2, 0.15, 0.15]);
         P(g, HEMI(), mat(0xc0392b), [0, 0.1, 0], [0.2, 0.12, 0.15], [Math.PI, 0, 0]);
+      } else if (sub === 'carrot') {
+        for (let i = 0; i < 2; i++) {
+          P(g, CONE(8), mat(c), [i * 0.12 - 0.06, 0.08, 0], [0.07, 0.3, 0.07], [Math.PI / 2, i * 0.4, 0]);
+          P(g, CONE(5), mat(0x5fb83a), [i * 0.12 - 0.06, 0.08, -0.2], [0.06, 0.14, 0.06], [-Math.PI / 2, 0, 0]);
+        }
+      } else if (sub === 'corn') {
+        P(g, CYL(8), mat(c), [0, 0.1, 0], [0.08, 0.36, 0.08], [Math.PI / 2, 0, 0]);
+        P(g, CONE(6), mat(0x8bc34a), [0, 0.1, -0.12], [0.1, 0.3, 0.1], [-Math.PI / 2, 0, 0]);
+      } else if (sub === 'watermelon') {
+        P(g, SPH(12, 8), mat(c, { roughness: 0.4 }), [0, 0.22, 0], [0.34, 0.22, 0.26]);
+        for (let i = 0; i < 4; i++) P(g, SPH(10, 6), mat(0x1f5f22, { roughness: 0.4 }), [0, 0.22, 0], [0.345, 0.225, 0.05], [i * 0.8, 0, 0]);
       } else {
         const r = sub === 'pumpkin' ? 0.3 : 0.16;
         P(g, SPH(12, 8), mat(c, { roughness: 0.4 }), [0, r, 0], [r, r * 0.85, r]);

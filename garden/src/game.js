@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
-import { G, newStats, activePlayers, rand, pick, clamp, dist2 } from './state.js';
+import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS, MARKET, COUNTER } from './config.js';
+import { G, newStats, activePlayers, attackedThings, rand, pick, clamp, dist2 } from './state.js';
 import { World, spawnPickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
 import { Player } from './players.js';
 import { Director, flashAt } from './enemies.js';
 import { updateSky } from './scene.js';
 import { sfx } from './audio.js';
-import { closeShop } from './shop.js';
+import { Market } from './market.js';
 
 const EMPTY = { mx: 0, mz: 0, ax: 0, az: 0, held: {}, pressed: {}, nav: {} };
 
@@ -15,6 +15,7 @@ export class Game {
   constructor(env) {
     this.env = env;
     G.director = new Director();
+    G.market = new Market(G.scene);
     this.camT = new THREE.Vector3(0, 0, 0);
     this.camDist = 34;
     this.endT = 0;
@@ -41,11 +42,12 @@ export class Game {
     G.money = 0; G.day = 1; G.time = 0; G.phase = 'day';
     G.upgrades = new Set(); G.stats = newStats();
     G.weather = 'clear'; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
+    G.jar.attackedAt = -99;
     G.director.reset();
     const w = G.world;
     // The old, overgrown garden
     for (const [i, j] of [[11, 18], [12, 18], [17, 18], [18, 18]]) { const c = w.cell(i, j); w.till(c, 1); w.addWeed(c); }
-    const inPlay = (c) => c.type === 'grass' && !c.weed && Math.abs(c.x) < 24 && Math.abs(c.z) < 24 && Math.hypot(c.x, c.z) > 4 && !(c.z < -14 && Math.abs(c.x) < 9);
+    const inPlay = (c) => c.type === 'grass' && !c.weed && Math.abs(c.x) < 24 && Math.abs(c.z) < 24 && Math.hypot(c.x, c.z) > 4 && c.z > -14;
     for (let k = 0; k < 26; k++) { const c = w.randomCell(inPlay); if (c) w.addWeed(c); }
     for (const c of w.cells) if (c.weed) { c.weed.grow = 1; c.weed.mesh.scale.setScalar(1); }
     for (let k = 0; k < 6; k++) { const c = w.randomCell(inPlay); if (c) spawnPickup('junk', 1, c.x + rand(-0.5, 0.5), c.z + rand(-0.5, 0.5), 0, false); }
@@ -66,7 +68,7 @@ export class Game {
     G.state = 'playing';
     G.hud.hideScreen();
     sfx('dawn');
-    G.fx.toast('☀️ Day 1', 'Pull weeds 🌿 &amp; grab junk 🥾 → sell at the shop counter → buy seeds 🌱. Water with morning dew 💧!');
+    G.fx.toast('☀️ Day 1', 'Pull weeds 🌿 &amp; grab junk 🥾 → sell at the Quick Sell counter → walk the market stalls to buy seeds 🌱. Water with morning dew 💧!');
   }
 
   // ───────────── Join / leave ─────────────
@@ -142,11 +144,13 @@ export class Game {
     this.updateCamera(dt);
     this.updateLights(dt);
     this.updateAmbient(dt);
+    G.market.update(dt);
     G.fx.update(dt);
   }
 
   tick(dt) {
     G.time += dt;
+    G.clock += dt;
     if (G.phase === 'day' && G.time >= DAY_LEN) this.dusk();
     else if (G.phase === 'night' && G.time >= NIGHT_LEN) this.dawn();
     if (G.state !== 'playing') return;
@@ -183,11 +187,11 @@ export class Game {
     G.phase = 'night';
     G.time = 0;
     sfx('dusk');
-    for (const p of activePlayers()) closeShop(p);
+    this.evictMarket();
     for (const e of G.enemies) if (!e.def.night) e.startFlee();
     const counts = G.director.onDusk();
     const list = Object.entries(counts).map(([k, n]) => `${ENEMIES[k].icon}×${n}`).join(' ');
-    G.fx.toast(`🌙 Night ${G.day}`, `The shop is closed. Defend the garden!${list ? ' Incoming: ' + list : ''}`, 'night');
+    G.fx.toast(`🌙 Night ${G.day}`, `The market is closed. Defend the garden!${list ? ' Incoming: ' + list : ''}`, 'night');
   }
 
   dawn() {
@@ -214,14 +218,13 @@ export class Game {
     sfx('dawn');
     const wtxt = { clear: 'Clear skies', rain: '🌧️ Rain: plants drink, half sun, no dew', heat: '🔥 Heatwave: water evaporates 2× faster' }[G.weather];
     const fresh = [PLANTS, TOOLS, PLACEABLES, SUPPLIES, UPGRADES].flatMap((o) => Object.values(o).filter((d) => d.unlock === G.day).map((d) => d.icon + ' ' + d.name));
-    G.fx.toast(`☀️ Day ${G.day} — Night ${G.day - 1} survived!`, `${wtxt} · Hot item: ${PLANTS[G.hotItem].icon} ${PLANTS[G.hotItem].name} sells ×2${fresh.length ? '<br>New in shop: ' + fresh.join(', ') : ''}`);
+    G.fx.toast(`☀️ Day ${G.day} — Night ${G.day - 1} survived!`, `${wtxt} · Hot item: ${PLANTS[G.hotItem].icon} ${PLANTS[G.hotItem].name} sells ×2${fresh.length ? '<br>New at the market: ' + fresh.join(', ') : ''}`);
     if (G.day % 10 === 0) setTimeout(() => G.fx.toast('⚠️ Tonight is a full moon…', 'Something big is coming. Prepare!', 'danger'), 2500);
   }
 
   gameOver() {
     G.state = 'gameover';
     this.endT = 0;
-    for (const p of activePlayers()) closeShop(p);
     G.fx.burst({ x: 0, y: 3.5, z: 0 }, 0xff6fa8, 60, { speed: 6, life: 1.5, grav: 3 });
     sfx('gameover');
     G.hud.showEnd(false);
@@ -231,6 +234,22 @@ export class Game {
     this.endT = 0;
     sfx('win');
     G.hud.showEnd(true);
+  }
+
+  // At dusk the market closes: anyone still browsing gets poofed out to the front entrance.
+  evictMarket() {
+    let k = 0;
+    for (const p of activePlayers()) {
+      const c = G.world.cellAt(p.pos.x, p.pos.z);
+      if (!c || c.j > MARKET.j1) continue;
+      G.fx.burst({ x: p.pos.x, y: 1, z: p.pos.z }, 0xffffff, 14, { speed: 3 });
+      p.pos.set(COUNTER.x + (k % 2 ? 1.5 : -1.5) * (1 + Math.floor(k / 2)), 0, MARKET.front + 1.2);
+      p.kv.set(0, 0, 0);
+      G.fx.burst({ x: p.pos.x, y: 1, z: p.pos.z }, 0xfff59d, 14, { speed: 3, emissive: true });
+      G.fx.text(p.pos, 'Market closed!', '#ffe082', 15);
+      k++;
+    }
+    if (k) sfx('pickup');
   }
 
   // ───────────── Projectiles ─────────────
@@ -304,18 +323,30 @@ export class Game {
       this.camT.set(0, 0, 0);
       return;
     }
-    let cx = 0, cz = 0;
-    for (const p of ps) { cx += p.pos.x; cz += p.pos.z; }
-    cx /= ps.length; cz /= ps.length;
-    let spread = 0;
-    for (const p of ps) spread = Math.max(spread, Math.hypot(p.pos.x - cx, (p.pos.z - cz) * 1.5));
-    if (G.state === 'gameover') { cx = 0; cz = 0; spread = 6; }
+    // Frame every gnome plus anything of yours that's under attack, so you always see the threat.
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    const add = (x, z, pad) => { x0 = Math.min(x0, x - pad); x1 = Math.max(x1, x + pad); z0 = Math.min(z0, z - pad); z1 = Math.max(z1, z + pad); };
+    if (G.state === 'gameover') add(0, 0, 6);
+    else {
+      for (const p of ps) add(p.pos.x, p.pos.z, 2.5);
+      if (G.state === 'playing' || G.state === 'paused') for (const t of attackedThings()) add(t.pos.x, t.pos.z, (t.radius ?? 1) + 2.5);
+    }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    // distance needed to fit the box: width against the horizontal FOV, depth against the tilted vertical FOV
+    const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), tanH = tanV * cam.aspect;
+    const needW = ((x1 - x0) * 1.15) / (2 * 1.156 * tanH);
+    const needD = (z1 - z0) * 1.45 / 1.115;
+    const want = clamp(Math.max(needW, needD), 17, 78);
     const k = Math.min(1, dt * 3);
-    this.camT.x += (clamp(cx, -16, 16) - this.camT.x) * k;
-    this.camT.z += (clamp(cz, -14, 15) - this.camT.z) * k;
-    const want = clamp(15 + spread * 1.25, 17, 50);
-    this.camDist += (want - this.camDist) * Math.min(1, dt * 2);
+    this.camT.x += (clamp(cx, -22, 22) - this.camT.x) * k;
+    // aim a bit south of the box center: the near (bottom) side needs more room in perspective
+    this.camT.z += (clamp(cz + 2.5, -22, 20) - this.camT.z) * k;
+    // zoom out fast when something new needs to be in view, ease back in slowly
+    this.camDist += (want - this.camDist) * Math.min(1, dt * (want > this.camDist ? 3 : 1.5));
     const d = this.camDist;
+    // push the fog back when zoomed far out so distant threats don't get washed out
+    G.scene.fog.near = Math.max(60, d * 1.3);
+    G.scene.fog.far = Math.max(130, d * 2.6);
     cam.position.set(this.camT.x, d * 0.92, this.camT.z + d * 0.7);
     cam.lookAt(this.camT.x, 0, this.camT.z - 1.5);
   }

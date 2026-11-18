@@ -9,7 +9,6 @@ import { sfx } from './audio.js';
 import { spawnPickup, removePickup } from './world.js';
 import { Plant } from './plants.js';
 import { Placeable, canPlaceOn } from './placeables.js';
-import { openShop, shopInput } from './shop.js';
 
 const SPAWNS = [[-2, -13], [2, -13], [-2, -10], [2, -10]];
 const UP = new THREE.Vector3(0, 1, 0);
@@ -30,7 +29,7 @@ export class Player {
     this.carry = null;
     this.can = 0; this.spray = 0;
     this.swingT = 0; this.cool = 0; this.holdT = 0; this.holdTarget = null; this.holdMax = 1;
-    this.shop = null; this.stun = 0; this.kv = new THREE.Vector3(); this.leaveT = 0; this.t = 0;
+    this.stall = null; this.sellAct = null; this.stun = 0; this.kv = new THREE.Vector3(); this.leaveT = 0; this.t = 0;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
     this.equipped = null; this.carryShown = null; this.ctx = null; this.xLabel = ''; this.streaming = false; this.pouring = false;
     this.msgT = 0;
@@ -49,7 +48,7 @@ export class Player {
 
   updateReticle() {
     let at = null, sq = false, r = 0.85;
-    if (this.active && !this.shop && G.state === 'playing') {
+    if (this.active && G.state === 'playing') {
       if (this.ctx && this.ctx.at) { at = this.ctx.at; sq = !!this.ctx.sq; }
       else {
         const t = this.tool;
@@ -147,7 +146,7 @@ export class Player {
   leave() {
     this.dropCarry();
     this.retSq.visible = this.retRing.visible = false;
-    this.shop = null;
+    this.stall = null; this.sellAct = null;
     this.active = false;
     this.model.group.visible = false;
     this.hose.visible = false;
@@ -161,7 +160,7 @@ export class Player {
     this.stun = 0;
   }
   resetForNewGame() {
-    this.tools = ['hands']; this.toolIdx = 0; this.carry = null; this.can = 0; this.spray = 0; this.shop = null;
+    this.tools = ['hands']; this.toolIdx = 0; this.carry = null; this.can = 0; this.spray = 0; this.stall = null; this.sellAct = null;
     this.stats = { harvests: 0, kills: 0, water: 0, weeds: 0, earned: 0, spent: 0, tilled: 0, planted: 0, bought: {}, sold: 0 };
     this.pos.set(SPAWNS[this.idx][0], 0, SPAWNS[this.idx][1]);
     this.facing = 0;
@@ -175,13 +174,6 @@ export class Player {
     this.heat = Math.max(0, (this.heat || 0) - dt * 0.45);
     if (this.overheat && this.heat < 0.3) this.overheat = false;
     this.streaming = false; this.pouring = false;
-
-    if (this.shop) {
-      shopInput(this, inp);
-      this.ctx = null;
-      this.animate(dt, 0);
-      return;
-    }
 
     let mx = inp.mx, mz = inp.mz;
     if (this.stun > 0) { mx = 0; mz = 0; }
@@ -226,9 +218,10 @@ export class Player {
 
   tryMove(dx, dz) {
     const w = G.world;
-    const free = !w.walkable(this.pos.x, this.pos.z);
-    if (free || w.walkable(this.pos.x + dx, this.pos.z)) this.pos.x += dx;
-    if (free || w.walkable(this.pos.x, this.pos.z + dz)) this.pos.z += dz;
+    const closed = G.phase === 'night'; // market aisles are roped off at night
+    const free = !w.walkable(this.pos.x, this.pos.z, 0.4, closed);
+    if (free || w.walkable(this.pos.x + dx, this.pos.z, 0.4, closed)) this.pos.x += dx;
+    if (free || w.walkable(this.pos.x, this.pos.z + dz, 0.4, closed)) this.pos.z += dz;
     const lim = HALF - 4.4;
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.z = clamp(this.pos.z, -lim, lim);
@@ -278,13 +271,24 @@ export class Player {
     const own = G.world.cellAt(this.pos.x, this.pos.z);
     const carry = this.carry;
     const [ck, sub] = carry ? carry.kind.split(':') : [];
-    if (Math.hypot(this.pos.x - COUNTER.x, this.pos.z - COUNTER.z) < 3 && this.dir.z < 0.3) {
+    // Market stall in front of you: A buys, X sells that item back (see useTool).
+    this.sellAct = null;
+    this.stall = G.market.stallNear(this);
+    if (this.stall) {
+      const st = this.stall;
+      this.sellAct = G.market.sellOption(this, st);
+      return { id: 'stall' + st.id, stall: st, at: st.pos, sq: true, label: `Buy ${st.item.name}`, run: () => G.market.buy(this, st) };
+    }
+    // Quick sell: the Trading Post counter at the market's front, or a Sell Stand in the garden.
+    const atCounter = Math.hypot(this.pos.x - COUNTER.x, this.pos.z - COUNTER.z) < 3 && this.dir.z < 0.3;
+    const stand = !atCounter && G.placeables.find((p) => p.type === 'sellbox' && !p.dead && dist2(p.pos, this.front(1.0)) < 1.4);
+    if (atCounter || stand) {
       if (carry && isSellable(carry.kind)) {
         const price = this.sellPrice();
-        return { id: 'sell', label: `Sell ${itemInfo(carry.kind).name} ×${carry.count} for $${price}`, run: () => this.sell() };
+        const where = stand ? stand.pos : { x: COUNTER.x, z: COUNTER.z - 1.2 };
+        return { id: 'sell', at: stand ? stand.pos : null, label: `Sell ${itemInfo(carry.kind).name} ×${carry.count} for $${price}`, run: () => this.sell(where) };
       }
-      if (G.phase === 'night') return { id: 'closed', label: 'Shop closed until dawn', run: () => sfx('error') };
-      return { id: 'shop', label: 'Open shop', run: () => openShop(this) };
+      if (atCounter) return { id: 'counter', label: 'Quick sell: bring anything here', run: () => sfx('error') };
     }
     const plant = this.plantInFront();
     if (carry) {
@@ -359,14 +363,14 @@ export class Player {
     }
     return sellEach(c.kind) * c.count;
   }
-  sell() {
+  sell(at = { x: COUNTER.x, z: COUNTER.z - 1.2 }) {
     const price = this.sellPrice();
     G.money += price;
     G.stats.moneyEarned += price;
     this.stats.earned += price;
     this.stats.sold += this.carry.count;
-    G.fx.text({ x: COUNTER.x, y: 1.5, z: COUNTER.z }, `+$${price}`, '#ffd54f', 24);
-    G.fx.burst({ x: COUNTER.x, y: 2, z: COUNTER.z - 1 }, 0xffd54f, 12, { speed: 4, emissive: true });
+    G.fx.text({ x: at.x, y: 1.5, z: at.z }, `+$${price}`, '#ffd54f', 24);
+    G.fx.burst({ x: at.x, y: 2, z: at.z }, 0xffd54f, 12, { speed: 4, emissive: true });
     this.carry = null;
     sfx('coin');
   }
@@ -488,6 +492,13 @@ export class Player {
     const tool = this.tool;
     const pressed = inp.pressed.x, held = inp.held.x;
     const tc = this.targetCell();
+    // at a market stall X sells that item back instead of using your tool
+    if (this.sellAct) {
+      this.xLabel = this.sellAct.label;
+      if (pressed) this.sellAct.run();
+      this.hose.visible = false;
+      return;
+    }
     this.xLabel = this.toolLabel(tc);
     switch (tool) {
       case 'hands':

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, GRID, HALF, FOREST, POND, SOIL, HEART_R } from './config.js';
+import { CELL, GRID, HALF, FOREST, POND, SOIL, HEART_R, MARKET, STALLS, SPIGOT } from './config.js';
 import { G, rand, clamp } from './state.js';
 import { makeWeed, makeItem, mat, BOX, P } from './models.js';
 
@@ -12,23 +12,30 @@ export class World {
         const x = i * CELL - HALF + CELL / 2, z = j * CELL - HALF + CELL / 2;
         let type = 'grass';
         if (i < FOREST || j < FOREST || i >= GRID - FOREST || j >= GRID - FOREST) type = 'forest';
-        else if (i >= 12 && i <= 17 && j >= 2 && j <= 5) type = 'solid'; // shop
-        else if (i === 18 && j === 5) type = 'solid'; // spigot
-        else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
+        else if (j >= MARKET.j0 && j <= MARKET.j1) {
+          const k = MARKET.kiosk, pz = MARKET.plaza;
+          if (i >= k.i0 && i <= k.i1 && j >= k.j0 && j <= k.j1) type = 'solid'; // Trading Post kiosk
+          else if (i >= pz.i0 && i <= pz.i1 && j === pz.j) type = 'plaza'; // in front of the quick-sell counter
+          else type = 'market'; // walkable floor; no tilling, weeds or gadgets
+        } else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
         else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'solid'; // heart bloom
         this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null });
       }
     }
+    for (const st of STALLS) this.cell(st.i, st.j).type = 'solid';
+    this.cellAt(SPIGOT.x, SPIGOT.z).type = 'solid';
   }
 
   cell(i, j) { return i < 0 || j < 0 || i >= GRID || j >= GRID ? null : this.cells[j * GRID + i]; }
   cellAt(x, z) { return this.cell(Math.floor((x + HALF) / CELL), Math.floor((z + HALF) / CELL)); }
 
   // Can a gnome stand at x,z (with radius r)?
-  walkable(x, z, r = 0.4) {
+  // `marketClosed`: at night the market aisles are roped off (the quick-sell plaza stays open).
+  walkable(x, z, r = 0.4, marketClosed = false) {
     for (const [dx, dz] of [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]]) {
       const c = this.cellAt(x + dx, z + dz);
       if (!c || c.type === 'forest' || c.type === 'solid' || c.type === 'water') return false;
+      if (marketClosed && c.type === 'market') return false;
       if (c.placeable && c.placeable.def.blocks) return false;
     }
     if (Math.hypot(x, z) < HEART_R - 0.2) return false;

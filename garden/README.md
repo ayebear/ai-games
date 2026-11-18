@@ -21,8 +21,8 @@ PORT=8080 npm run prod   # use a different port
 |---|---|---|---|
 | Join / pause / leave | Start / tap Start / hold Start | Enter / tap / hold | Right Shift / tap / hold |
 | Move | Left stick, D-pad | WASD | Arrows |
-| Interact | A | Space | . |
-| Use tool | X or RT (hold for hose, can, sprayer) | J | , |
+| Interact / buy at a stall | A | Space | . |
+| Use tool / sell at a stall | X or RT (hold for hose, can, sprayer) | J | , |
 | Drop / throw | B / Y | K / L | / / ; |
 | Drop equipped tool | hold B | hold K | hold / |
 | Switch tool | LB / RB | Q / E | M / ' |
@@ -41,7 +41,8 @@ Press a button on each controller once after the page loads so the browser can s
 | `src/plants.js` | Plant growth model (water/sun/soil) and the Heart Bloom |
 | `src/placeables.js` | Garden gadgets (sprinkler, zapper, lamp, …) |
 | `src/world.js` | Grid, plots, weeds, ground pickups |
-| `src/shop.js`, `src/hud.js` | Shop menus, HUD, title and results screens |
+| `src/market.js` | The walk-in market: one stall per item (buy with A, sell back with X), Quick Sell counter |
+| `src/hud.js` | HUD, stall cards, attack alarms, title and results screens |
 | `src/models.js`, `src/scene.js` | Procedural low-poly models and scene setup |
 | `src/input.js`, `src/audio.js`, `src/fx.js` | Gamepad/keyboard input, synthesized SFX, particles |
 
