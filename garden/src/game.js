@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, DEFS, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS } from './config.js';
-import { G, newStats, activePlayers, attentionThings, rand, pick, clamp, dist2 } from './state.js';
+import { DAY_LEN, NIGHT_LEN, GOAL_DAYS, PLANTS, DEFS, ENEMIES, HALF, PLAYER_NAMES, MAX_PLAYERS, WEATHER, WEATHER_FADE } from './config.js';
+import { G, newStats, activePlayers, attentionThings, rand, pick, clamp, dist2, lerp, wx } from './state.js';
 import { World, spawnPickup, removePickup, updatePickups } from './world.js';
 import { Heart } from './plants.js';
 import { Player } from './players.js';
@@ -9,6 +9,14 @@ import { updateSky } from './scene.js';
 import { sfx } from './audio.js';
 import { Market } from './market.js';
 import { iconHTML, stallIconId } from './icons.js';
+
+// Random weather, weighted by WEATHER[k].weight.
+function pickWeather() {
+  const list = Object.entries(WEATHER);
+  let r = Math.random() * list.reduce((n, [, w]) => n + w.weight, 0);
+  for (const [k, w] of list) if ((r -= w.weight) < 0) return k;
+  return 'clear';
+}
 
 const EMPTY = { mx: 0, mz: 0, ax: 0, az: 0, held: {}, pressed: {}, nav: {} };
 
@@ -42,7 +50,7 @@ export class Game {
     G.heart = new Heart();
     G.money = 0; G.day = 1; G.time = 0; G.phase = 'day';
     G.seen = new Set(); G.stats = newStats();
-    G.weather = 'clear'; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
+    G.weather = 'clear'; for (const k in G.wx) G.wx[k] = k === 'clear' ? 1 : 0; G.hotItem = 'daisy'; G.boss = null; G.endless = false;
     G.jar.attackedAt = -99;
     G.director.reset();
     const w = G.world;
@@ -58,7 +66,7 @@ export class Game {
   }
 
   spawnDew() {
-    const n = 8 + 3 * Math.max(1, activePlayers().length);
+    const n = Math.round((8 + 3 * Math.max(1, activePlayers().length)) * (WEATHER[G.weather].dew ?? 1));
     for (let k = 0; k < n; k++) {
       const c = G.world.randomCell((c) => (c.type === 'grass' || c.type === 'plot') && Math.hypot(c.x, c.z) < 21 && Math.hypot(c.x, c.z) > 3.5 && !c.placeable);
       if (c) spawnPickup('dew', 1, c.x + rand(-0.6, 0.6), c.z + rand(-0.6, 0.6), 0, false);
@@ -69,7 +77,7 @@ export class Game {
     G.state = 'playing';
     G.hud.hideScreen();
     sfx('dawn');
-    G.fx.toast('☀️ Day 1', 'Pull weeds 🌿 and grab junk → sell at the 💰 Quick Sell kiosk → buy 🌼 Daisy seeds at Crop Seeds. Water with morning dew 💧!');
+    G.fx.toast('☀️ Day 1', 'Grow flowers. Protect the Heart Bloom.');
   }
 
   // ───────────── Join / leave ─────────────
@@ -141,7 +149,7 @@ export class Game {
     }
     // sky & lights always
     const p = G.phase === 'day' ? G.time / DAY_LEN : G.time / NIGHT_LEN;
-    G.night = updateSky(this.env, { phase: G.phase, p, weather: G.weather, focus: this.camT });
+    G.night = updateSky(this.env, { phase: G.phase, p, wx: G.wx, focus: this.camT });
     this.updateCamera(dt);
     this.updateLights(dt);
     this.updateAmbient(dt);
@@ -155,8 +163,10 @@ export class Game {
     if (G.phase === 'day' && G.time >= DAY_LEN) this.dusk();
     else if (G.phase === 'night' && G.time >= NIGHT_LEN) this.dawn();
     if (G.state !== 'playing') return;
+    // today's weather fades in, the others fade out
+    for (const k in G.wx) G.wx[k] = clamp(G.wx[k] + (k === G.weather ? 1 : -1) * (dt / WEATHER_FADE), 0, 1);
     const p = G.phase === 'day' ? G.time / DAY_LEN : 0;
-    G.sun = G.phase === 'day' ? clamp(Math.sin(p * Math.PI) * 1.5, 0, 1) * (G.weather === 'rain' ? 0.5 : 1) : 0;
+    G.sun = G.phase === 'day' ? clamp(Math.sin(p * Math.PI) * 1.5, 0, 1) * wx('sun') : 0;
 
     G.director.update(dt);
     for (const pl of activePlayers()) pl.update(dt, G.input.get(pl.device) || EMPTY);
@@ -202,10 +212,9 @@ export class Game {
     for (const e of G.enemies) e.startFlee();
     if (G.day > GOAL_DAYS && !G.endless) { this.victory(); return; }
     // weather & market
-    const r = Math.random();
-    G.weather = G.day < 3 ? 'clear' : r < 0.2 ? 'rain' : r < 0.35 ? 'heat' : 'clear';
+    G.weather = G.day < 3 ? 'clear' : pickWeather();
     G.hotItem = pick(Object.keys(PLANTS).filter((k) => PLANTS[k].unlock <= G.day));
-    if (G.weather !== 'rain') this.spawnDew();
+    this.spawnDew();
     for (let k = 0; k < 3; k++) {
       const c = G.world.randomCell((c) => c.type === 'grass' && !c.weed && !c.placeable && Math.abs(c.x) < 25 && Math.abs(c.z) < 25 && Math.hypot(c.x, c.z) > 3.5);
       if (c) G.world.addWeed(c);
@@ -216,7 +225,8 @@ export class Game {
     }
     G.director.onDawn();
     sfx('dawn');
-    const wtxt = { clear: 'Clear skies', rain: '🌧️ Rain: plants drink, half sun, no dew', heat: '🔥 Heatwave: water evaporates 2× faster' }[G.weather];
+    const W = WEATHER[G.weather];
+    const wtxt = G.weather === 'clear' ? W.desc : `${W.icon} ${W.name}: ${W.desc.toLowerCase()}`;
     const fresh = Object.entries(DEFS)
       .flatMap(([kind, defs]) => Object.entries(defs).filter(([, d]) => d.unlock === G.day).map(([key, d]) => `${iconHTML(stallIconId(kind, key))} ${d.name}`));
     G.fx.toast(`☀️ Day ${G.day} — Night ${G.day - 1} survived!`, `${wtxt} · Hot item: ${PLANTS[G.hotItem].icon} ${PLANTS[G.hotItem].name} sells ×2${fresh.length ? '<br>New at the market: ' + fresh.join(', ') : ''}`);
@@ -330,8 +340,10 @@ export class Game {
     this.camDist += (want - this.camDist) * Math.min(1, dt * (want > this.camDist ? 3 : 1.5));
     const d = this.camDist;
     // push the fog back when zoomed far out so distant threats don't get washed out
-    G.scene.fog.near = Math.max(60, d * 1.3);
-    G.scene.fog.far = Math.max(130, d * 2.6);
+    // fog weather pulls it in close (but never hides the gnomes)
+    const fogK = G.wx.fog;
+    G.scene.fog.near = lerp(Math.max(60, d * 1.3), d * 0.75, fogK);
+    G.scene.fog.far = lerp(Math.max(130, d * 2.6), d * 1.75, fogK);
     cam.position.set(this.camT.x, d * 0.92, this.camT.z + d * 0.7);
     cam.lookAt(this.camT.x, 0, this.camT.z - 1.5);
   }
@@ -358,7 +370,9 @@ export class Game {
 
   updateAmbient(dt) {
     const { rain, fireflies } = this.env;
-    rain.visible = G.weather === 'rain' && G.state !== 'title';
+    const { snow } = this.env;
+    rain.visible = G.wx.rain > 0.01;
+    rain.material.opacity = 0.45 * G.wx.rain;
     if (rain.visible) {
       const pos = rain.geometry.attributes.position.array;
       rain.userData.drops.forEach((d, i) => {
@@ -367,6 +381,20 @@ export class Game {
         pos.set([d.x, d.y, d.z, d.x + 0.1, d.y + 0.8, d.z], i * 6);
       });
       rain.geometry.attributes.position.needsUpdate = true;
+    }
+    snow.visible = G.wx.snow > 0.01;
+    snow.material.opacity = 0.9 * G.wx.snow;
+    if (snow.visible) {
+      const pos = snow.geometry.attributes.position.array;
+      snow.userData.flakes.forEach((f, i) => {
+        f.y -= dt * f.s;
+        f.p += dt;
+        if (f.y < 0) { f.y = 24 + Math.random() * 4; f.x = this.camT.x + (Math.random() - 0.5) * 70; f.z = this.camT.z + (Math.random() - 0.5) * 60; }
+        pos[i * 3] = f.x + Math.sin(f.p * 0.9) * 0.8;
+        pos[i * 3 + 1] = f.y;
+        pos[i * 3 + 2] = f.z + Math.cos(f.p * 0.7) * 0.6;
+      });
+      snow.geometry.attributes.position.needsUpdate = true;
     }
     const nk = G.night;
     fireflies.material.opacity = nk * 0.9;

@@ -15,7 +15,23 @@ export const PLAYER_NAMES = ['Red', 'Blue', 'Yellow', 'Green'];
 export const SPIGOT = { x: 7, z: -13 };
 export const POND = { x: -19.5, z: 19.5, r: 4.3 };
 export const HOSE_LEN = 26;
-export const HEART_R = 2.3;
+export const HEART_R = 2.3; // reach: how close counts as "at the Heart" (watering, pests biting it)
+export const HEART_HIT = 0.9; // what gnomes bump into: the stem and leaves (grows with the Heart)
+export const SPIGOT_HIT = 0.35;
+
+// ───────────────────────── Weather ─────────────────────────
+// One weather per day, picked at dawn (weight = how often). It fades in over WEATHER_FADE seconds,
+// and every effect below is blended by how far it has faded in, so nothing switches abruptly.
+// Multipliers (1 = no change): sun = sunlight, drain = how fast water dries up, grow = growth
+// speed, dew = morning dew. rain = water falling from the sky (0..1).
+export const WEATHER_FADE = 12;
+export const WEATHER = {
+  clear: { name: 'Clear', icon: '🌤️', weight: 55, desc: 'Clear skies' },
+  rain: { name: 'Rain', icon: '🌧️', weight: 16, sun: 0.5, dew: 0, rain: 1, desc: 'Plants drink, half sun, no dew' },
+  heat: { name: 'Heatwave', icon: '🔥', weight: 11, drain: 1.8, desc: 'Water dries up twice as fast' },
+  fog: { name: 'Fog', icon: '🌫️', weight: 10, sun: 0.7, dew: 2, desc: 'Hard to see, soft sun, double dew' },
+  snow: { name: 'Snow', icon: '❄️', weight: 8, sun: 0.6, drain: 0.3, grow: 0.6, dew: 0, desc: 'Cold: slow growth, but plants barely dry out' },
+};
 
 export const SOIL = [
   { name: 'Dirt', mult: 0.6, color: 0x7a5534 },
@@ -92,18 +108,20 @@ export const BAGS = {
 };
 
 // ───────────────────────── Gadgets (shared, placed on the grid) ─────────────────────────
+// blocks: gnomes can't walk through it (hit = its shape: a circle radius, or a [w, d] box) and
+// fenced pests (deer, raccoons) can't enter its cell.
 export const PLACEABLES = {
-  fence: { name: 'Fence', icon: '🧱', cost: 4, hp: 45, blocks: true, unlock: 1, desc: 'Blocks deer and raccoons. Slugs slip under.' },
+  fence: { name: 'Fence', icon: '🧱', cost: 4, hp: 45, blocks: true, hit: [2.0, 0.36], unlock: 1, desc: 'Blocks deer and raccoons. Slugs slip under.' },
   beertrap: { name: 'Beer Trap', icon: '🍺', cost: 6, hp: 20, radius: 5.5, uses: 4, unlock: 1, desc: 'Lures and drowns slugs. 4 uses.' },
-  barrel: { name: 'Rain Barrel', icon: '🛢️', cost: 20, hp: 50, blocks: true, unlock: 2, desc: 'Refill cans and sprayers here.' },
-  compost: { name: 'Compost Bin', icon: '♻️', cost: 25, hp: 50, blocks: true, unlock: 2, desc: 'Feed it 4 weeds, get 1 Soil Bag.' },
-  scarecrow: { name: 'Scarecrow', icon: '👒', cost: 30, hp: 60, blocks: true, radius: 8, unlock: 3, desc: "Crows won't land nearby." },
-  lamp: { name: 'Sun Lamp', icon: '💡', cost: 40, hp: 40, blocks: true, radius: 5.5, unlock: 3, desc: 'Plants grow at night. Scares deer. Draws moths.' },
+  barrel: { name: 'Rain Barrel', icon: '🛢️', cost: 20, hp: 50, blocks: true, hit: 0.6, unlock: 2, desc: 'Refill cans and sprayers here.' },
+  compost: { name: 'Compost Bin', icon: '♻️', cost: 25, hp: 50, blocks: true, hit: [1.3, 1.3], unlock: 2, desc: 'Feed it 4 weeds, get 1 Soil Bag.' },
+  scarecrow: { name: 'Scarecrow', icon: '👒', cost: 30, hp: 60, blocks: true, hit: 0.3, radius: 8, unlock: 3, desc: "Crows won't land nearby." },
+  lamp: { name: 'Sun Lamp', icon: '💡', cost: 40, hp: 40, blocks: true, hit: 0.32, radius: 5.5, unlock: 3, desc: 'Plants grow at night. Scares deer. Draws moths.' },
   sprinkler: { name: 'Sprinkler', icon: '⛲', cost: 50, hp: 30, radius: 4.3, unlock: 4, desc: 'Waters nearby plants. Wet soil draws slugs.' },
-  ladybugs: { name: 'Ladybug House', icon: '🐞', cost: 60, hp: 40, blocks: true, radius: 6, unlock: 4, desc: 'Ladybugs eat mites nearby.' },
-  zapper: { name: 'Bug Zapper', icon: '⚡', cost: 90, hp: 40, blocks: true, radius: 5.5, unlock: 5, desc: 'Zaps flies and moths in range.' },
-  beehive: { name: 'Beehive', icon: '🐝', cost: 150, hp: 50, blocks: true, radius: 7, unlock: 6, desc: 'Nearby plants +25% size and value.' },
-  sellbox: { name: 'Sell Stand', icon: '🏷️', cost: 250, hp: 60, blocks: true, unlock: 7, desc: 'Sell anything right in your garden.' },
+  ladybugs: { name: 'Ladybug House', icon: '🐞', cost: 60, hp: 40, blocks: true, hit: 0.32, radius: 6, unlock: 4, desc: 'Ladybugs eat mites nearby.' },
+  zapper: { name: 'Bug Zapper', icon: '⚡', cost: 90, hp: 40, blocks: true, hit: 0.32, radius: 5.5, unlock: 5, desc: 'Zaps flies and moths in range.' },
+  beehive: { name: 'Beehive', icon: '🐝', cost: 150, hp: 50, blocks: true, hit: [1.0, 0.85], radius: 7, unlock: 6, desc: 'Nearby plants +25% size and value.' },
+  sellbox: { name: 'Sell Stand', icon: '🏷️', cost: 250, hp: 60, blocks: true, hit: [1.5, 1.1], unlock: 7, desc: 'Sell anything right in your garden.' },
 };
 
 // ───────────────────────── Plant care (consumables) ─────────────────────────
@@ -119,24 +137,27 @@ export const MULCH_HEAL = 150;
 export const DEFS = { seed: PLANTS, supply: SUPPLIES, tool: TOOLS, bag: BAGS, kit: PLACEABLES };
 
 // ───────────────────────── Market (walk-in store) ─────────────────────────
-// Five shops, each selling one kind of thing. Every item has its own stall, and a shop's stalls
-// are always sorted cheapest-first by unlock day, then price, so better items sit further right.
-// Three rows, all facing the camera (south), each reached from its south side:
-//   front  row (j=6): Seeds, Plant Care       (reached from the garden; the Quick Sell kiosk between)
-//   middle row (j=4): Garden Gear, Pest Control  (per-gnome tools and bags)
-//   back   row (j=2): Gadgets                  (shared things you place in the garden)
-// The aisles are j=3 and j=5.
-export const MARKET = { j0: 2, j1: 6, kiosk: { i0: 14, i1: 15, j0: 5, j1: 6 }, plaza: { i0: 13, i1: 16, j: 7 } };
+// The market is one big flower. The Quick Sell kiosk is its center and each of the five shops is
+// a petal fanning out from it. Every item floats in the air over its spot: starter items sit
+// at the petal's base (near the kiosk) and later, better ones toward its tip (sorted by unlock day,
+// then price). Nothing blocks: gnomes walk freely between the items, and the one you stand at is
+// the item you're browsing.
+export const MARKET = { j0: 2, j1: 7, kiosk: { i0: 14, i1: 15, j0: 7, j1: 7 }, plaza: { i0: 13, i1: 16, j: 8 } };
 const cx = (i) => i * CELL - HALF + CELL / 2;
 export const COUNTER = { x: 0, z: cx(MARKET.plaza.j) - 0.4 }; // where you stand to quick sell
+export const FLOWER = { x: 0, z: -15.2 }; // the flower's center (the kiosk)
+// Petal shape: distance of the first row from the center, spacing along and across the petal,
+// and how many pads each row holds (base → tip).
+export const PETAL = { r0: 4.3, step: 2.35, across: 2.35, rows: [1, 2, 2, 2, 2, 2] };
 
-// stock: which items the shop sells, as [kind, filter?] pairs.
+// stock: which items the shop sells, as [kind, filter?] pairs. angle: the petal's direction in
+// degrees (0 = east, 90 = north, 180 = west).
 export const SHOPS = [
-  { id: 'seeds', name: 'Seeds', icon: '🌱', color: 0x43a047, css: '#7cc554', row: 6, at: 2, stock: [['seed']] },
-  { id: 'care', name: 'Plant Care', icon: '🧪', color: 0x8e5bb5, css: '#c39be0', row: 6, at: 17, stock: [['supply']] },
-  { id: 'gear', name: 'Garden Gear', icon: '🧰', color: 0xb5793a, css: '#e0a46a', row: 4, at: 3, stock: [['tool', (d) => !d.weapon], ['bag']] },
-  { id: 'pest', name: 'Pest Control', icon: '🎯', color: 0xd84336, css: '#ff8a7a', row: 4, at: 18, stock: [['tool', (d) => d.weapon]] },
-  { id: 'gadgets', name: 'Gadgets', icon: '⛲', color: 0x2f86d6, css: '#74b9f0', row: 2, at: 9, stock: [['kit']] },
+  { id: 'seeds', name: 'Seeds', icon: '🌱', color: 0x43a047, css: '#7cc554', angle: 172, stock: [['seed']] },
+  { id: 'gear', name: 'Garden Gear', icon: '🧰', color: 0xb5793a, css: '#e0a46a', angle: 136, stock: [['tool', (d) => !d.weapon], ['bag']] },
+  { id: 'care', name: 'Plant Care', icon: '🧪', color: 0x8e5bb5, css: '#c39be0', angle: 90, stock: [['supply']] },
+  { id: 'pest', name: 'Pest Control', icon: '🎯', color: 0xd84336, css: '#ff8a7a', angle: 44, stock: [['tool', (d) => d.weapon]] },
+  { id: 'gadgets', name: 'Gadgets', icon: '⛲', color: 0x2f86d6, css: '#74b9f0', angle: 8, stock: [['kit']] },
 ];
 for (const shop of SHOPS) {
   shop.items = shop.stock
@@ -144,7 +165,28 @@ for (const shop of SHOPS) {
     .sort((a, b) => a.d.unlock - b.d.unlock || a.d.cost - b.d.cost)
     .map(({ kind, key }) => [kind, key]);
 }
-export const STALLS = SHOPS.flatMap((shop) => shop.items.map(([kind, key], n) => ({ shop: shop.id, kind, key, i: shop.at + n, j: shop.row })));
+// One stall (pad) per item, laid out row by row along each petal.
+export const STALLS = [];
+for (const shop of SHOPS) {
+  const a = (shop.angle * Math.PI) / 180;
+  const along = { x: Math.cos(a), z: -Math.sin(a) }, side = { x: Math.sin(a), z: Math.cos(a) };
+  const at = (r, s) => ({ x: FLOWER.x + along.x * r + side.x * s, z: FLOWER.z + along.z * r + side.z * s });
+  let n = 0, row = 0;
+  while (n < shop.items.length) {
+    const width = Math.min(PETAL.rows[Math.min(row, PETAL.rows.length - 1)], shop.items.length - n);
+    const r = PETAL.r0 + row * PETAL.step;
+    for (let k = 0; k < width; k++, n++) {
+      const [kind, key] = shop.items[n];
+      STALLS.push({ shop: shop.id, kind, key, row, ...at(r, (k - (width - 1) / 2) * PETAL.across) });
+    }
+    row++;
+  }
+  // the shop's sign floats just past the petal's tip; its petal-shaped floor patch spans the rows
+  shop.rows = row;
+  shop.sign = at(PETAL.r0 + (row - 0.4) * PETAL.step, 0);
+  shop.sign.z = Math.max(shop.sign.z, -25.2); // keep it inside the market fence
+  shop.patch = { ...at(PETAL.r0 + ((row - 1) * PETAL.step) / 2, 0), len: (row - 1) * PETAL.step + 2.6, angle: a };
+}
 
 // ───────────────────────── Enemies ─────────────────────────
 export const ENEMIES = {

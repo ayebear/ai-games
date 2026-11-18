@@ -174,6 +174,16 @@ export function createScene(container) {
   rain.userData.drops = Array.from({ length: rainN }, () => ({ x: (Math.random() - 0.5) * 70, y: Math.random() * 30, z: (Math.random() - 0.5) * 70 }));
   scene.add(rain);
 
+  // ── Snow ──
+  const snowN = 700;
+  const snowGeo = new THREE.BufferGeometry();
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(snowN * 3), 3));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.32, transparent: true, opacity: 0, depthWrite: false }));
+  snow.frustumCulled = false;
+  snow.visible = false;
+  snow.userData.flakes = Array.from({ length: snowN }, () => ({ x: (Math.random() - 0.5) * 70, y: Math.random() * 28, z: (Math.random() - 0.5) * 70, p: Math.random() * 10, s: 2 + Math.random() * 1.5 }));
+  scene.add(snow);
+
   // Fireflies at night
   const ffGeo = new THREE.BufferGeometry();
   const ffN = 60;
@@ -189,7 +199,7 @@ export function createScene(container) {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  return { renderer, scene, camera, sun, hemi, stars, rain, fireflies, lampLights, playerLights, heartLight };
+  return { renderer, scene, camera, sun, hemi, stars, rain, snow, fireflies, lampLights, playerLights, heartLight };
 }
 
 export function makeTextTexture(text, fg, bg) {
@@ -207,51 +217,66 @@ export function makeTextTexture(text, fg, bg) {
 }
 
 // ── Sky / lighting per time of day ──
-const SKY = {
-  dawn: new THREE.Color(0xf6b38a), day: new THREE.Color(0x8fd3ff), dusk: new THREE.Color(0xf0855a),
-  night: new THREE.Color(0x0b1430), rain: new THREE.Color(0x8a9aa8),
-};
-const tmp = new THREE.Color();
-export function updateSky(env, { phase, p, weather, focus }) {
-  // p = progress 0..1 within phase
+// Everything here is a continuous function of the time of day and the weather fade-in weights, so
+// there are no jumps at dawn or dusk:
+// - `light` runs 0 (deep night) → 0.5 (sunrise / sunset, exactly at the phase change) → 1 (day).
+// - The directional light is the sun by day and the moon by night. Each one fades to zero at the
+//   horizon, so the swap from sun to moon (which flips the shadow direction) is never visible.
+const C = (h) => new THREE.Color(h);
+const SKY = { day: C(0x8fd3ff), night: C(0x0b1430), dawn: C(0xf6a98a), dusk: C(0xf0855a) };
+const WX_SKY = { rain: C(0x7d8b97), heat: C(0xffd28a), fog: C(0xb9c3c9), snow: C(0xdfe7ee) };
+const HEMI = { day: C(0xcfe8ff), night: C(0x4a5a9a), groundDay: C(0x5a7a3a), groundNight: C(0x1a2a20) };
+const SUN = { low: C(0xffb27a), high: C(0xfff4e0), moon: C(0x9fb4ff) };
+const tmp = new THREE.Color(), tmp2 = new THREE.Color();
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const v1 = new THREE.Vector3(), right = new THREE.Vector3(), upv = new THREE.Vector3(), fpos = new THREE.Vector3();
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
+// p = progress 0..1 within the phase. wx = weather weights. Returns how dark it is (0..1).
+export function updateSky(env, { phase, p, wx, focus }) {
   const { scene, sun, hemi, stars } = env;
-  let sky, sunI, hemiI, elev, az, sunColor;
-  if (phase === 'day') {
-    elev = Math.sin(p * Math.PI);
-    az = p;
-    const edge = Math.min(p, 1 - p);
-    if (edge < 0.12) {
-      const k = edge / 0.12;
-      tmp.copy(p < 0.5 ? SKY.dawn : SKY.dusk).lerp(SKY.day, k);
-    } else tmp.copy(SKY.day);
-    sky = tmp;
-    sunI = 0.6 + 2.4 * Math.min(1, elev * 1.6);
-    hemiI = 0.55 + 0.6 * Math.min(1, elev * 2);
-    sunColor = edge < 0.12 ? 0xffc89a : 0xfff4e0;
-  } else {
-    elev = 0.3 + Math.sin(p * Math.PI) * 0.5;
-    az = p;
-    const edge = Math.min(p, 1 - p);
-    if (edge < 0.1) tmp.copy(p < 0.5 ? SKY.dusk : SKY.dawn).lerp(SKY.night, edge / 0.1);
-    else tmp.copy(SKY.night);
-    sky = tmp;
-    sunI = 0.55;
-    hemiI = 0.28;
-    sunColor = 0x9fb4ff;
-  }
-  if (weather === 'rain') { sky = tmp.lerp(SKY.rain, phase === 'day' ? 0.6 : 0.2); sunI *= 0.55; }
-  if (weather === 'heat' && phase === 'day') sky = tmp.lerp(new THREE.Color(0xffd28a), 0.25);
-  scene.background.copy(sky);
-  scene.fog.color.copy(sky);
-  const ang = az * Math.PI;
-  sun.position.set(focus.x + Math.cos(ang) * -60, 20 + elev * 55, focus.z + 25);
-  sun.target.position.set(focus.x, 0, focus.z);
-  sun.intensity = sunI;
-  sun.color.setHex(sunColor);
-  hemi.intensity = hemiI;
-  hemi.color.setHex(phase === 'night' ? 0x4a5a9a : 0xcfe8ff);
-  hemi.groundColor.setHex(phase === 'night' ? 0x1a2a20 : 0x5a7a3a);
-  const nightK = phase === 'night' ? Math.min(1, Math.min(p, 1 - p) / 0.1) : 0;
-  stars.material.opacity = nightK * 0.9;
-  return nightK;
+  const day = phase === 'day';
+  const arc = Math.sin(p * Math.PI); // height of the sun (by day) or the moon (by night)
+  const edge = Math.min(p, 1 - p);
+  const light = day ? 0.5 + 0.5 * smooth(0, 0.14, edge) : 0.5 - 0.5 * smooth(0, 0.12, edge);
+  const twilight = 1 - Math.abs(light * 2 - 1); // 1 right at sunrise/sunset
+  const morning = day ? p < 0.5 : p > 0.5;
+  const cloud = Math.min(1, (wx.rain ?? 0) + (wx.fog ?? 0) + (wx.snow ?? 0));
+
+  // sky: night → day, warm glow around sunrise/sunset, then weather tint
+  tmp.copy(SKY.night).lerp(SKY.day, light).lerp(morning ? SKY.dawn : SKY.dusk, twilight * 0.75 * (1 - cloud * 0.6));
+  tmp.lerp(WX_SKY.rain, (wx.rain ?? 0) * lerp(0.2, 0.6, light));
+  tmp.lerp(WX_SKY.fog, (wx.fog ?? 0) * lerp(0.15, 0.55, light));
+  tmp.lerp(WX_SKY.snow, (wx.snow ?? 0) * lerp(0.15, 0.5, light));
+  tmp.lerp(WX_SKY.heat, (wx.heat ?? 0) * 0.25 * light);
+  scene.background.copy(tmp);
+  scene.fog.color.copy(tmp);
+
+  // directional light: sun or moon, fading out at the horizon
+  const lift = smooth(0, 0.3, arc);
+  const dim = 1 - 0.45 * (wx.rain ?? 0) - 0.35 * (wx.fog ?? 0) - 0.4 * (wx.snow ?? 0);
+  sun.intensity = (day ? 3.0 * lift : 0.55 * lift) * dim;
+  sun.color.copy(day ? tmp2.copy(SUN.low).lerp(SUN.high, smooth(0.1, 0.5, arc)) : SUN.moon);
+  hemi.intensity = lerp(0.3, 1.15, light) * (1 - 0.15 * cloud);
+  hemi.color.copy(HEMI.night).lerp(HEMI.day, light);
+  hemi.groundColor.copy(HEMI.groundNight).lerp(HEMI.groundDay, light);
+
+  // light position: an east → west arc, kept centered on the camera focus. The focus is snapped to
+  // shadow-map texels (in light space) so shadow edges don't shimmer while the camera moves.
+  const ang = p * Math.PI;
+  v1.set(Math.cos(ang) * -60, 20 + arc * 55, 25);
+  const dir = v1.clone().normalize();
+  right.crossVectors(dir, WORLD_UP).normalize();
+  upv.crossVectors(right, dir);
+  const sc = sun.shadow.camera, texel = (sc.right - sc.left) / sun.shadow.mapSize.x;
+  fpos.set(focus.x, 0, focus.z);
+  const a = Math.round(fpos.dot(right) / texel) * texel, b = Math.round(fpos.dot(upv) / texel) * texel, c = fpos.dot(dir);
+  fpos.copy(right).multiplyScalar(a).addScaledVector(upv, b).addScaledVector(dir, c);
+  sun.target.position.copy(fpos);
+  sun.position.copy(fpos).add(v1);
+
+  const night = Math.min(1, (0.5 - light) * 2.2);
+  stars.material.opacity = Math.max(0, night) * 0.9 * (1 - cloud * 0.85);
+  return Math.max(0, night);
 }

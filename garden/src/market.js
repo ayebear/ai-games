@@ -1,13 +1,13 @@
-// The walk-in market. Items are grouped into shops by category (see SHOPS in config.js). Every
-// shop is a row of stalls under one menu board: a colored header with the shop's name, and one
-// panel per item with its icon, price and name. Walk up to a stall: A buys, X sells that item back.
-// The Quick Sell kiosk in the middle buys anything.
+// The walk-in market: one big flower (see SHOPS / STALLS in config.js). The Quick Sell kiosk is the
+// center, each shop is a petal, and every item floats in the air with a price tag (icon + price)
+// above it. Nothing blocks: stand at an item to browse it, A buys, X sells that item back. Items
+// that haven't arrived yet are shown faded out. Each petal has one floating sign with its name.
 import * as THREE from 'three';
 import {
-  TOOLS, BAGS, DEFS, SPRAY_CAP, STALLS, SHOPS, MARKET, CELL, HALF, toolBase,
+  TOOLS, BAGS, DEFS, SPRAY_CAP, STALLS, SHOPS, MARKET, FLOWER, CELL, HALF, toolBase,
 } from './config.js';
 import { G, dist2 } from './state.js';
-import { P, mat, glow, BOX, CYL, CONE, PLANE, makeTool, makeItem, makePlaceable, makePlantModel, makeBag } from './models.js';
+import { P, mat, glow, BOX, CYL, PLANE, makeTool, makeItem, makePlaceable, makePlantModel, makeBag } from './models.js';
 import { glyphsFor } from './input.js';
 import { drawIcon, iconHTML, stallIconId } from './icons.js';
 import { sfx } from './audio.js';
@@ -20,12 +20,12 @@ const carryKind = (it) => (it.kind === 'seed' ? 'seed:' + it.key : it.kind === '
 // Carried kinds a stall buys back: a seed stall also buys that plant's produce.
 const buysBack = (it) => (it.kind === 'seed' ? ['produce:' + it.key, 'seed:' + it.key] : it.kind === 'kit' || it.kind === 'supply' ? [carryKind(it)] : []);
 
-const TABLE_Y = 0.9;
-// Menu board geometry (per stall panel, and the shop header above the panels).
-// Tilted well back toward the camera and kept low, so gnomes in the aisle behind stay visible.
-const BOARD = { y: 1.5, z: -0.62, w: 1.98, h: 1.04, tilt: -0.72 };
-const HEADER_H = 0.46;
-const PANEL_PX = { w: 300, h: 158 };
+const ITEM_Y = 0.75; // items float this high
+const ITEM_SCALE = 1.5;
+const TAG_Y = 2.75; // price tag
+const TAG_PX = { w: 300, h: 112 };
+const LOCKED_ALPHA = 0.2; // items that haven't arrived yet
+const SIGN_PX = { w: 640, h: 128 };
 const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
 
 // What a stall sells.
@@ -57,83 +57,63 @@ export class Market {
     this.scene = scene;
     this.t = 0;
     this.refreshT = 0;
-    this.stalls = STALLS.map((s, n) => this.buildStall(s, n));
-    this.headers = SHOPS.map((shop) => this.buildShopFrame(shop));
-    for (const st of this.stalls) this.headers.find((h) => h.shop === st.shopDef).stalls.push(st);
+    this.stalls = STALLS.map((s, n) => this.buildPad(s, n));
+    this.signs = SHOPS.map((shop) => this.buildSign(shop));
     this.buildGrounds();
   }
 
   // ───────────── Building ─────────────
-  buildStall(s, n) {
+  // One item floating in the air, spinning slowly, with a price tag over it and a soft spot of the
+  // shop's color on the floor under it.
+  buildPad(s, n) {
     const shop = SHOP[s.shop];
     const g = new THREE.Group();
-    g.position.set(cellX(s.i), 0, cellX(s.j));
-    // table: wooden crate with a cloth in the shop's color
-    P(g, BOX(), mat(0x9a6a3a), [0, 0.4, 0.05], [1.6, 0.8, 1.1]);
-    P(g, BOX(), mat(shop.color), [0, 0.84, 0.05], [1.72, 0.08, 1.24]);
-    P(g, BOX(), mat(shop.color), [0, 0.66, 0.68], [1.72, 0.3, 0.04]);
-    // this item's panel on the shop's menu board
+    g.position.set(s.x, 0, s.z);
+    const shadowMat = new THREE.MeshBasicMaterial({ color: shop.color, transparent: true, opacity: 0.3, depthWrite: false });
+    P(g, CYL(20), shadowMat, [0, 0.04, 0], [0.7, 0.01, 0.7], [0, 0, 0], false);
+    const spin = new THREE.Group();
+    spin.position.y = ITEM_Y;
+    const model = displayFor(s.kind, s.key);
+    model.scale.setScalar(ITEM_SCALE);
+    // own copies of the materials, so a not-yet-arrived item can fade out on its own
+    const mats = [];
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = o.material.clone();
+      o.material.userData.baseOpacity = o.material.opacity;
+      mats.push(o.material);
+    });
+    spin.add(model);
+    g.add(spin);
+    // price tag
     const cv = document.createElement('canvas');
-    cv.width = PANEL_PX.w; cv.height = PANEL_PX.h;
+    cv.width = TAG_PX.w; cv.height = TAG_PX.h;
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    const boardMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true });
-    P(g, PLANE(), boardMat, [0, BOARD.y, BOARD.z], [BOARD.w, BOARD.h, 1], [BOARD.tilt, 0, 0], false);
-    // "NEW" tag that floats above the board until a gnome has looked at the item
-    const top = BOARD.h / 2 + HEADER_H;
-    const newTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: newTagTex(), toneMapped: false, depthTest: false }));
-    newTag.position.set(0, BOARD.y + top * Math.cos(BOARD.tilt) + 0.45, BOARD.z + top * Math.sin(BOARD.tilt));
-    newTag.userData.y0 = newTag.position.y;
-    newTag.scale.set(1.0, 0.42, 1);
-    newTag.renderOrder = 5;
-    newTag.visible = false;
-    g.add(newTag);
-    // the display item, spinning slowly on the table
-    const spin = new THREE.Group();
-    spin.position.set(0, TABLE_Y, 0.12);
-    g.add(spin);
-    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, toneMapped: false, depthWrite: false }));
+    tag.position.y = TAG_Y;
+    tag.scale.set(1.7, 1.7 * (TAG_PX.h / TAG_PX.w), 1);
+    g.add(tag);
     this.scene.add(g);
-    const st = {
-      id: n, ...s, item: stallItem(s), shopDef: shop, group: g, spin, canvas: cv, tex, boardMat, newTag, boardKey: '',
-      pos: new THREE.Vector3(g.position.x, 0, g.position.z), phase: Math.random() * 6,
+    return {
+      id: n, ...s, item: stallItem(s), shopDef: shop, group: g, spin, tag, canvas: cv, tex, mats, shadowMat, tagKey: '', faded: null,
+      pos: new THREE.Vector3(s.x, 0, s.z), phase: Math.random() * 6,
     };
-    spin.add(displayFor(s.kind, s.key));
-    return st;
   }
 
-  // Posts and the shop-name header that sit on top of the shop's row of panels.
-  buildShopFrame(shop) {
-    const n = shop.items.length;
-    const x0 = cellX(shop.at) - CELL / 2, x1 = cellX(shop.at + n - 1) + CELL / 2;
-    const z = cellX(shop.row);
-    const g = new THREE.Group();
-    g.position.set((x0 + x1) / 2, 0, z);
-    const w = x1 - x0 - 0.04;
-    const cos = Math.cos(BOARD.tilt), sin = Math.sin(BOARD.tilt);
-    // the header sits right above the panels, on the same tilted plane
-    const up = BOARD.h / 2 + HEADER_H / 2;
-    const hy = BOARD.y + up * cos, hz = BOARD.z + up * sin;
-    const top = BOARD.h / 2 + HEADER_H;
-    // wooden frame behind the whole board (shifted up along the board by half the header and
-    // back along its normal), and two posts
-    const fh = BOARD.h + HEADER_H + 0.12, fc = HEADER_H / 2, back = 0.04;
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.85, transparent: true });
-    P(g, BOX(), wood, [0, BOARD.y + fc * cos + back * sin, BOARD.z + fc * sin - back * cos], [w + 0.14, fh, 0.05], [BOARD.tilt, 0, 0]);
-    for (const sx of [-1, 1]) P(g, CYL(6), wood, [sx * (w / 2 + 0.02), (BOARD.y + top * cos) / 2, BOARD.z + top * sin], [0.07, BOARD.y + top * cos, 0.07]);
+  // A floating sign past the petal's tip with the shop's name (and CLOSED / ★ NEW).
+  buildSign(shop) {
     const cv = document.createElement('canvas');
-    cv.width = Math.round(PANEL_PX.w * n * (w / (n * BOARD.w)));
-    cv.height = Math.round(PANEL_PX.w * (HEADER_H / BOARD.w));
+    cv.width = SIGN_PX.w; cv.height = SIGN_PX.h;
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    const headMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true });
-    P(g, PLANE(), headMat, [0, hy, hz], [w, HEADER_H, 1], [BOARD.tilt, 0, 0], false);
-    this.scene.add(g);
-    const h = { shop, canvas: cv, tex, key: '', mats: [wood, headMat], x0, x1, z, fade: 1, stalls: [] };
-    drawHeader(h, false, 0);
-    return h;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, toneMapped: false, depthWrite: false }));
+    sp.position.set(shop.sign.x, 3.1, shop.sign.z);
+    sp.scale.set(3.6, 3.6 * (SIGN_PX.h / SIGN_PX.w), 1);
+    this.scene.add(sp);
+    const sign = { shop, sprite: sp, canvas: cv, tex, key: '', stalls: this.stalls.filter((st) => st.shop === shop.id) };
+    drawSign(sign, false, 0);
+    return sign;
   }
 
   buildGrounds() {
@@ -144,6 +124,12 @@ export class Market {
     floorTex.repeat.set(13, 2.6);
     const floor = P(sc, PLANE(), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 }), [0, 0.02, (z0 + z1) / 2], [53, z1 - z0 + 0.4, 1], [-Math.PI / 2, 0, 0], false);
     floor.receiveShadow = true;
+    // the flower drawn on the floor: a golden center under the kiosk and a petal per shop
+    P(sc, CYL(32), new THREE.MeshStandardMaterial({ color: 0xffd54f, transparent: true, opacity: 0.45, roughness: 1 }), [FLOWER.x, 0.035, FLOWER.z], [2.3, 0.01, 2.3], [0, 0, 0], false);
+    for (const shop of SHOPS) {
+      const pt = shop.patch;
+      P(sc, CYL(32), new THREE.MeshStandardMaterial({ color: shop.color, transparent: true, opacity: 0.3, roughness: 1 }), [pt.x, 0.03, pt.z], [pt.len / 2, 0.01, 1.85], [0, pt.angle, 0], false);
+    }
     // plain back fence
     const fz = z0 - 0.3;
     for (let x = -26; x <= 26.01; x += 2) P(sc, BOX(), mat(0x8d6e4b), [x, 0.7, fz], [0.16, 1.4, 0.16]);
@@ -159,13 +145,12 @@ export class Market {
     const g = new THREE.Group();
     g.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
     const w = x1 - x0 - 0.2, d = z1 - z0 - 0.2;
-    P(g, BOX(), mat(0xf3e5c8), [0, 1.3, -0.5], [w, 2.6, d - 1]);
+    // a one-cell-deep booth (so the aisle behind it stays open): back wall, counter, striped awning
+    P(g, BOX(), mat(0xf3e5c8), [0, 1.3, -d / 2 + 0.2], [w, 2.6, 0.4]);
     P(g, BOX(), mat(0x8d6e4b), [0, 0.55, d / 2 - 0.4], [w, 1.1, 0.7]); // counter
     P(g, BOX(), mat(0xa1887f), [0, 1.15, d / 2 - 0.4], [w + 0.2, 0.1, 0.9]);
-    const roof = P(g, CONE(4), mat(0xffb300, { flat: true }), [0, 3.4, 0], [1, 1.4, 1], [0, Math.PI / 4, 0]);
-    roof.scale.set(w * 0.78, 1.4, d * 0.78);
-    for (let i = 0; i < 5; i++) P(g, BOX(), mat(i % 2 ? 0xffffff : 0xffb300), [-w / 2 + (i + 0.5) * (w / 5), 2.55, d / 2 - 0.1], [w / 5, 0.1, 1.0], [0.4, 0, 0]);
-    for (const sx of [-1, 1]) P(g, BOX(), mat(0x5d4037), [sx * (w / 2 - 0.1), 1.3, d / 2 - 0.05], [0.12, 2.6, 0.12]);
+    for (let i = 0; i < 5; i++) P(g, BOX(), mat(i % 2 ? 0xffffff : 0xffb300), [-w / 2 + (i + 0.5) * (w / 5), 2.62, 0.05], [w / 5, 0.1, d + 0.1], [0.32, 0, 0]);
+    for (const sx of [-1, 1]) P(g, BOX(), mat(0x5d4037), [sx * (w / 2 - 0.1), 1.2, d / 2 - 0.05], [0.12, 2.4, 0.12]);
     // coin jar (raccoons are after this)
     P(g, CYL(12), mat(0xe0f7fa, { transparent: true, opacity: 0.45, roughness: 0.05 }), [0.95, 1.6, d / 2 - 0.4], [0.3, 0.7, 0.3]);
     P(g, CYL(12), glow(0xffd54f, 0.4), [0.95, 1.45, d / 2 - 0.4], [0.26, 0.4, 0.26]);
@@ -183,8 +168,8 @@ export class Market {
     x.font = `bold 30px ${FONT}`; x.fillText('Sell anything here', 256, 118);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    P(g, BOX(), mat(0x3e2723), [0, 3.0, d / 2 + 0.25], [3.5, 1.08, 0.1], [-0.25, 0, 0]);
-    P(g, PLANE(), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), [0, 3.0, d / 2 + 0.31], [3.4, 1.0, 1], [-0.25, 0, 0], false);
+    P(g, BOX(), mat(0x3e2723), [0, 3.45, -d / 2 + 0.3], [3.5, 1.08, 0.1], [-0.25, 0, 0]);
+    P(g, PLANE(), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), [0, 3.45, -d / 2 + 0.36], [3.4, 1.0, 1], [-0.25, 0, 0], false);
     g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
     this.scene.add(g);
   }
@@ -194,32 +179,30 @@ export class Market {
     this.t += dt;
     for (const st of this.stalls) {
       st.spin.rotation.y += dt * 0.7;
-      st.spin.position.y = TABLE_Y + Math.sin(this.t * 2 + st.phase) * 0.04;
-      if (st.newTag.visible) st.newTag.position.y = st.newTag.userData.y0 + Math.sin(this.t * 3 + st.phase) * 0.08;
-    }
-    // a board fades out while a gnome stands in the aisle right behind it
-    const gnomes = G.slots.filter((p) => p && p.active);
-    for (const h of this.headers) {
-      const behind = gnomes.some((p) => p.pos.x > h.x0 - 0.6 && p.pos.x < h.x1 + 0.6 && p.pos.z < h.z - 0.6 && p.pos.z > h.z - 3.4);
-      const want = behind ? 0.28 : 1;
-      if (Math.abs(h.fade - want) < 0.01) continue;
-      h.fade += (want - h.fade) * Math.min(1, dt * 8);
-      for (const m of h.mats) m.opacity = h.fade;
-      for (const st of h.stalls) st.boardMat.opacity = h.fade;
+      st.spin.position.y = ITEM_Y + Math.sin(this.t * 1.6 + st.phase) * 0.06;
     }
     this.refreshT -= dt;
     if (this.refreshT > 0) return;
     this.refreshT = 0.2;
     const closed = this.closed();
-    for (const h of this.headers) drawHeader(h, closed, h.stalls.filter((st) => this.isNew(st)).length);
+    for (const sign of this.signs) drawSign(sign, closed, sign.stalls.filter((st) => this.isNew(st)).length);
     for (const st of this.stalls) {
       const b = this.board(st);
-      // locked items aren't on display yet: the table stays empty
-      st.spin.visible = !b.locked;
-      st.newTag.visible = this.isNew(st) && !closed;
-      if (b.key === st.boardKey) continue;
-      st.boardKey = b.key;
-      drawPanel(st, b);
+      // not here yet: shown, but faded right out (and so is its tag)
+      if (st.faded !== !!b.locked) {
+        st.faded = !!b.locked;
+        for (const m of st.mats) {
+          m.transparent = st.faded || m.userData.baseOpacity < 1;
+          m.opacity = (m.userData.baseOpacity ?? 1) * (st.faded ? LOCKED_ALPHA : 1);
+          m.depthWrite = !st.faded;
+          m.needsUpdate = true;
+        }
+        st.tag.material.opacity = st.faded ? LOCKED_ALPHA : 1;
+        st.shadowMat.opacity = st.faded ? 0.08 : 0.3;
+      }
+      if (b.key === st.tagKey) continue;
+      st.tagKey = b.key;
+      drawTag(st, b);
       st.tex.needsUpdate = true;
     }
   }
@@ -235,7 +218,7 @@ export class Market {
   // What a stall's panel shows (the same for everyone).
   board(st) {
     const it = st.item;
-    if (G.day < it.unlock) return { key: 'lock' + it.unlock, locked: true, price: `Day ${it.unlock}`, col: '#9e9e9e' };
+    if (G.day < it.unlock) return { key: 'lock' + it.unlock, locked: true, price: `$${it.cost}`, col: '#e0e0e0' };
     const closed = this.closed();
     const afford = G.money >= it.cost;
     const hot = it.kind === 'seed' && G.hotItem === it.key;
@@ -244,13 +227,13 @@ export class Market {
   }
 
   // ───────────── Interaction ─────────────
-  // The stall right in front of a gnome (if any).
+  // The item a gnome is standing at or facing (if any).
   stallNear(p) {
-    const f = p.front(1.0);
-    let best = null, bd = 1.55;
+    const f = p.front(0.6);
+    let best = null, bd = 1.35;
     for (const st of this.stalls) {
       const d = dist2(st.pos, f);
-      if (d < bd && dist2(st.pos, p.pos) < 2.6) { bd = d; best = st; }
+      if (d < bd) { bd = d; best = st; }
     }
     return best;
   }
@@ -425,85 +408,61 @@ function roundRect(x, X, Y, w, h, r) {
   x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath();
 }
 
-// Shop header: the shop's icon and name on its color. At night it says CLOSED.
-function drawHeader(h, closed, fresh) {
+// A shop's floating sign: its icon and name on its color. At night it says CLOSED.
+function drawSign(sign, closed, fresh) {
   const key = `${closed}|${fresh}`;
-  if (h.key === key) return;
-  h.key = key;
-  const { shop, canvas: cv } = h;
+  if (sign.key === key) return;
+  sign.key = key;
+  const { shop, canvas: cv } = sign;
   const x = cv.getContext('2d');
   const W = cv.width, H = cv.height;
   x.clearRect(0, 0, W, H);
   x.fillStyle = closed ? '#455a64' : shop.css;
-  x.fillRect(0, 0, W, H);
-  x.fillStyle = 'rgba(0,0,0,0.18)';
-  x.fillRect(0, H - 6, W, 6);
+  roundRect(x, 4, 4, W - 8, H - 8, 40); x.fill();
+  x.strokeStyle = 'rgba(255,255,255,0.85)'; x.lineWidth = 6;
+  roundRect(x, 4, 4, W - 8, H - 8, 40); x.stroke();
   x.textBaseline = 'middle';
   x.textAlign = 'center';
-  const label = `${shop.icon} ${shop.name.toUpperCase()}${closed ? ' · CLOSED' : fresh ? `  ★ ${fresh} NEW` : ''}`;
-  let fs = Math.round(H * 0.62);
+  const label = `${shop.icon} ${shop.name.toUpperCase()}${closed ? ' · CLOSED' : fresh ? `  ★${fresh}` : ''}`;
+  let fs = 64;
   x.font = `bold ${fs}px ${FONT}`;
-  while (x.measureText(label).width > W - 24 && fs > 14) { fs -= 2; x.font = `bold ${fs}px ${FONT}`; }
+  while (x.measureText(label).width > W - 50 && fs > 20) { fs -= 2; x.font = `bold ${fs}px ${FONT}`; }
   x.fillStyle = '#1b1b1b';
-  x.fillText(label, W / 2 + 2, H / 2 + 2);
+  x.fillText(label, W / 2 + 3, H / 2 + 5);
   x.fillStyle = '#fff';
-  x.fillText(label, W / 2, H / 2);
-  h.tex.needsUpdate = true;
+  x.fillText(label, W / 2, H / 2 + 2);
+  sign.tex.needsUpdate = true;
 }
 
-// One item's panel on the menu board: icon and price on top, name underneath.
-function drawPanel(st, b) {
+// An item's price tag: its icon and price, with ★ NEW / 🔥 ×2 badges.
+function drawTag(st, b) {
   const x = st.canvas.getContext('2d');
-  const W = PANEL_PX.w, H = PANEL_PX.h;
+  const W = TAG_PX.w, H = TAG_PX.h;
   x.clearRect(0, 0, W, H);
-  x.fillStyle = '#26352c';
-  x.fillRect(0, 0, W, H);
-  // thin dividers between neighboring panels
-  x.fillStyle = 'rgba(0,0,0,0.35)';
-  x.fillRect(0, 0, 3, H); x.fillRect(W - 3, 0, 3, H);
-  x.globalAlpha = b.locked ? 0.25 : b.dim ? 0.5 : 1;
-  // light disc behind the icon so dark tools read on the dark board
-  x.fillStyle = 'rgba(255,255,255,0.16)';
-  x.beginPath(); x.arc(72, 64, 54, 0, Math.PI * 2); x.fill();
-  drawIcon(x, st.item.icon, 72, 64, 108);
   x.globalAlpha = b.dim ? 0.6 : 1;
+  x.fillStyle = 'rgba(22,32,24,0.88)';
+  roundRect(x, 8, 22, W - 16, H - 30, 30); x.fill();
+  x.strokeStyle = st.shopDef.css; x.lineWidth = 5;
+  roundRect(x, 8, 22, W - 16, H - 30, 30); x.stroke();
   x.textBaseline = 'middle';
-  x.textAlign = 'center';
+  x.textAlign = 'left';
+  x.font = `bold ${b.price.length > 4 ? 46 : 54}px ${FONT}`;
+  const tw = x.measureText(b.price).width, iw = 62, gap = 10;
+  const x0 = (W - (iw + gap + tw)) / 2;
+  drawIcon(x, st.item.icon, x0 + iw / 2, 63, iw);
   x.fillStyle = b.col;
-  x.font = `bold ${b.price.length > 4 ? 46 : 60}px ${FONT}`;
-  x.fillText(b.price, 210, 64);
-  x.fillStyle = b.locked ? '#9e9e9e' : '#fff';
-  let fs = 30;
-  x.font = `bold ${fs}px ${FONT}`;
-  while (x.measureText(st.item.name).width > W - 20 && fs > 16) { fs -= 2; x.font = `bold ${fs}px ${FONT}`; }
-  x.fillText(st.item.name, W / 2, 136);
+  x.fillText(b.price, x0 + iw + gap, 66);
   x.globalAlpha = 1;
-  if (b.hot && !b.dim) {
-    x.fillStyle = '#ff6d00';
-    roundRect(x, W - 92, 6, 86, 34, 10); x.fill();
-    x.fillStyle = '#fff';
-    x.font = `bold 22px ${FONT}`;
-    x.fillText('🔥 ×2', W - 49, 24);
+  const badge = b.fresh && !b.dim ? ['★ NEW', '#ffd600', '#3e2723'] : b.hot && !b.dim ? ['🔥 ×2', '#ff6d00', '#fff'] : null;
+  if (badge) {
+    x.textAlign = 'center';
+    x.font = `bold 24px ${FONT}`;
+    const w = x.measureText(badge[0]).width + 22;
+    x.fillStyle = badge[1];
+    roundRect(x, W - w - 4, 2, w, 34, 14); x.fill();
+    x.fillStyle = badge[2];
+    x.fillText(badge[0], W - w / 2 - 4, 20);
   }
-}
-
-let newTex = null;
-function newTagTex() {
-  if (newTex) return newTex;
-  const cv = document.createElement('canvas');
-  cv.width = 240; cv.height = 100;
-  const x = cv.getContext('2d');
-  x.fillStyle = '#ffd600';
-  roundRect(x, 6, 6, 228, 88, 40); x.fill();
-  x.strokeStyle = '#3e2723'; x.lineWidth = 6;
-  roundRect(x, 6, 6, 228, 88, 40); x.stroke();
-  x.fillStyle = '#3e2723';
-  x.font = `bold 58px ${FONT}`;
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('★ NEW', 120, 54);
-  newTex = new THREE.CanvasTexture(cv);
-  newTex.colorSpace = THREE.SRGBColorSpace;
-  return newTex;
 }
 
 function cobbleTexture() {

@@ -43,27 +43,44 @@ export class Player {
     for (const [x, z, sx, sz] of [[0, -0.92, 1.9, 0.1], [0, 0.92, 1.9, 0.1], [-0.92, 0, 0.1, 1.9], [0.92, 0, 0.1, 1.9]]) P(this.retSq, BOX(), rm, [x, 0, z], [sx, 0.04, sz], [0, 0, 0], false);
     this.retRing = new THREE.Mesh(RING(), mat(this.color, { emissive: this.color, emissiveIntensity: 1.2, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }));
     this.retRing.rotation.x = -Math.PI / 2;
-    G.scene.add(this.retSq, this.retRing);
-    this.retSq.visible = this.retRing.visible = false;
+    // shop items: a ring with a $ inside
+    this.retShop = new THREE.Group();
+    const shopRing = new THREE.Mesh(RING(), this.retRing.material);
+    shopRing.rotation.x = -Math.PI / 2;
+    shopRing.scale.setScalar(0.95);
+    const dollar = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: dollarTex(this.color), transparent: true, depthWrite: false, toneMapped: false }));
+    dollar.rotation.x = -Math.PI / 2;
+    dollar.position.y = 0.01;
+    this.retShop.add(shopRing, dollar);
+    G.scene.add(this.retSq, this.retRing, this.retShop);
+    this.retSq.visible = this.retRing.visible = this.retShop.visible = false;
   }
 
+  // Ground marker for what A / X will act on: a square for a whole cell (plots, placing, tilling),
+  // a ring for round things (plants, weeds, gadgets, pickups; ctx.r sets its size), and a ring with
+  // a $ for shop items.
   updateReticle() {
-    let at = null, sq = false, r = 0.85;
+    let at = null, shape = 'ring', r = 0.85;
     if (this.active && G.state === 'playing') {
-      if (this.ctx && this.ctx.at) { at = this.ctx.at; sq = !!this.ctx.sq; }
+      if (this.ctx && this.ctx.at) { at = this.ctx.at; shape = this.ctx.stall ? 'shop' : this.ctx.sq ? 'sq' : 'ring'; r = this.ctx.r ?? r; }
       else {
         const t = this.tool;
-        if (t === 'shovel') { const tc = this.targetCell(); if (tc && (tc.type === 'grass' || tc.type === 'plot')) { at = tc; sq = true; } }
-        else if (t === 'can' || t === 'spray' || t === 'swatter' || t === 'hose') at = this.plantInFront();
+        if (t === 'shovel') {
+          const tc = this.targetCell();
+          if (tc && tc.weed) { at = tc.weed.mesh.position; r = 0.5; }
+          else if (tc && (tc.type === 'grass' || tc.type === 'plot')) { at = tc; shape = 'sq'; }
+        } else if (t === 'can' || t === 'spray' || t === 'swatter' || t === 'hose') at = this.plantInFront();
       }
     }
-    this.retSq.visible = !!at && sq;
-    this.retRing.visible = !!at && !sq;
+    this.retSq.visible = !!at && shape === 'sq';
+    this.retRing.visible = !!at && shape === 'ring';
+    this.retShop.visible = !!at && shape === 'shop';
     if (!at) return;
     const pos = at.pos ?? at;
-    if (at.kind === 'plant') r = 0.8; else if (!sq && !at.kind) r = 0.55;
+    if (at.kind === 'plant') r = 0.8; else if (shape === 'ring' && !at.kind && this.ctx?.r == null) r = Math.min(r, 0.55);
     const pulse = 1 + Math.sin(this.t * 6) * 0.06;
-    if (sq) { this.retSq.position.set(pos.x, 0.17, pos.z); this.retSq.scale.setScalar(pulse); }
+    if (shape === 'sq') { this.retSq.position.set(pos.x, 0.17, pos.z); this.retSq.scale.setScalar(pulse); }
+    else if (shape === 'shop') { this.retShop.position.set(pos.x, 0.06, pos.z); this.retShop.scale.setScalar(pulse); }
     else { this.retRing.position.set(pos.x, 0.18, pos.z); this.retRing.scale.setScalar(r * pulse); }
   }
 
@@ -154,7 +171,7 @@ export class Player {
 
   leave() {
     this.dropCarry();
-    this.retSq.visible = this.retRing.visible = false;
+    this.retSq.visible = this.retRing.visible = this.retShop.visible = false;
     this.stall = null; this.sellAct = null;
     this.active = false;
     this.model.group.visible = false;
@@ -233,6 +250,10 @@ export class Player {
     const free = !w.walkable(this.pos.x, this.pos.z, 0.4);
     if (free || w.walkable(this.pos.x + dx, this.pos.z, 0.4)) this.pos.x += dx;
     if (free || w.walkable(this.pos.x, this.pos.z + dz, 0.4)) this.pos.z += dz;
+    // slide around round things (Heart, pond, spigot, round gadgets); undo if that hits a wall
+    const px = this.pos.x, pz = this.pos.z;
+    w.pushOut(this.pos, 0.4);
+    if (!free && !w.walkable(this.pos.x, this.pos.z, 0.4)) { this.pos.x = px; this.pos.z = pz; }
     const lim = HALF - 4.4;
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.z = clamp(this.pos.z, -lim, lim);
@@ -288,7 +309,7 @@ export class Player {
     if (this.stall) {
       const st = this.stall;
       this.sellAct = G.market.sellOption(this, st);
-      return { id: 'stall' + st.id, stall: st, at: st.pos, sq: true, label: `Buy ${st.item.name}`, run: () => G.market.buy(this, st) };
+      return { id: 'stall' + st.id, stall: st, at: st.pos, label: `Buy ${st.item.name}`, run: () => G.market.buy(this, st) };
     }
     // Quick sell: the kiosk in the middle of the market, or a Sell Stand in the garden.
     const atCounter = Math.hypot(this.pos.x - COUNTER.x, this.pos.z - COUNTER.z) < 3 && this.dir.z < 0.3;
@@ -360,11 +381,13 @@ export class Player {
       return { id: 'full', at: plant, label: this.fullWhy('produce:' + plant.type), off: true };
     }
     const wc = tc && tc.weed ? tc : own && own.weed ? own : null;
-    if (wc && !this.canTake('weed') && !(tc && tc.plant && tc.plant.bloomed)) return { id: 'fullw', at: wc, sq: true, label: this.fullWhy('weed'), off: true };
-    if (wc && this.canTake('weed')) return { id: `weed${wc.i},${wc.j}`, at: wc, sq: true, label: 'Pull weed', hold: 0.5, run: () => this.pullWeed(wc) };
+    if (wc && !this.canTake('weed') && !(tc && tc.plant && tc.plant.bloomed)) return { id: 'fullw', at: wc.weed.mesh.position, r: 0.5, label: this.fullWhy('weed'), off: true };
+    if (wc && this.canTake('weed')) return { id: `weed${wc.i},${wc.j}`, at: wc.weed.mesh.position, r: 0.5, label: 'Pull weed', hold: 0.5, run: () => this.pullWeed(wc) };
     if (!carry && tc && tc.placeable) {
       const pl = tc.placeable;
-      return { id: `pack${tc.i},${tc.j}`, at: tc, sq: true, label: `Pack up ${pl.def.name}`, hold: 1.0, run: () => { pl.destroy(); this.give('kit:' + pl.type); sfx('pickup'); } };
+      // a fence is a straight wall: mark its cell; everything else is round-ish
+      const mark = pl.type === 'fence' ? { at: tc, sq: true } : { at: pl.pos, r: Math.max(0.6, typeof pl.def.hit === 'number' ? pl.def.hit + 0.3 : 0.9) };
+      return { id: `pack${tc.i},${tc.j}`, ...mark, label: `Pack up ${pl.def.name}`, hold: 1.0, run: () => { pl.destroy(); this.give('kit:' + pl.type); sfx('pickup'); } };
     }
     if (carry && !this.ctx) return null;
     return null;
@@ -770,4 +793,23 @@ export class Player {
     m.ring.material.emissiveIntensity = 0.4 + Math.sin(this.t * 4) * 0.2;
     this.updateReticle();
   }
+}
+
+// A "$" drawn in a player's color, for the shop-item target marker.
+const dollarTexs = new Map();
+function dollarTex(color) {
+  if (dollarTexs.has(color)) return dollarTexs.get(color);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const x = cv.getContext('2d');
+  x.font = 'bold 104px "Trebuchet MS", sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = 10; x.strokeStyle = 'rgba(0,0,0,0.55)';
+  x.strokeText('$', 64, 70);
+  x.fillStyle = '#' + new THREE.Color(color).getHexString();
+  x.fillText('$', 64, 70);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  dollarTexs.set(color, t);
+  return t;
 }

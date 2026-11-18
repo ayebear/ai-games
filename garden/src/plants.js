@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PLANTS, SOIL, HEART_R, REGROW_AT } from './config.js';
-import { G, clamp, dist2, rand } from './state.js';
+import { G, clamp, dist2, rand, wx } from './state.js';
 import { makePlantModel, makeHeart, P, SPH, mat } from './models.js';
 import { sfx } from './audio.js';
 import { spawnPickup } from './world.js';
@@ -74,15 +74,15 @@ export class Plant {
     }
     const sun = sunAt(this.pos.x, this.pos.z);
     this.sunNow = sun;
-    let drain = 0.005 + 0.011 * G.sun * (G.weather === 'heat' ? 2 : 1);
+    let drain = (0.005 + 0.011 * G.sun) * wx('drain');
     if (this.cell.weed) drain *= 1.6;
     if (d.thirsty) drain *= d.thirsty;
-    if (G.weather === 'rain') this.water += 0.012 * dt;
+    this.water += 0.012 * dt * wx('rain');
     this.water = clamp(this.water - drain * dt, 0, 1.25);
     const wf = { none: 0, low: 0.5, ok: 1, soggy: 0.45 }[this.waterState];
     this.waterF = wf;
     const sf = d.sunNeed ? Math.pow(sun, d.sunNeed) * 1.5 : sun;
-    const rate = wf * sf * SOIL[this.cell.soil].mult * (this.hive ? 1.25 : 1) * (this.mites > 5 ? 0.6 : 1);
+    const rate = wf * sf * wx('grow') * SOIL[this.cell.soil].mult * (this.hive ? 1.25 : 1) * (this.mites > 5 ? 0.6 : 1);
     if (this.stage < 4) this.growth += (dt / d.grow) * rate;
     else if (this.size < d.maxSize) this.size = Math.min(d.maxSize, this.size + (dt * rate * (d.maxSize - 1)) / (d.grow * 1.6));
 
@@ -227,7 +227,7 @@ export class Heart {
 
   update(dt) {
     this.t += dt;
-    this.water = clamp(this.water - dt * 0.004 * (G.weather === 'heat' ? 2 : 1) + (G.weather === 'rain' ? 0.01 * dt : 0), 0, 1.2);
+    this.water = clamp(this.water - dt * 0.004 * wx('drain') + 0.01 * dt * wx('rain'), 0, 1.2);
     const ws = this.waterState;
     if (ws === 'none' && this.hp > 0) {
       this.hp -= dt * HEART_THIRST;

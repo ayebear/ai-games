@@ -42,7 +42,7 @@ Press a button on each controller once after the page loads so the browser can s
 | `src/plants.js` | Plant growth model (water/sun/soil) and the Heart Bloom |
 | `src/placeables.js` | Garden gadgets (sprinkler, zapper, lamp, …) |
 | `src/world.js` | Grid, plots, weeds, ground pickups |
-| `src/market.js` | The walk-in market: shops with menu boards, one stall per item (buy with A, sell back with X), NEW tags, Quick Sell kiosk |
+| `src/market.js` | The flower-shaped market: one petal per shop, a floating pad per item (buy with A, sell back with X), price tags, NEW badges, Quick Sell kiosk |
 | `src/icons.js` | Item icons rendered from the 3D models at startup (used on boards, cards and the HUD) |
 | `src/hud.js` | HUD, stall cards, attack alarms, title and results screens |
 | `src/models.js`, `src/scene.js` | Procedural low-poly models and scene setup |

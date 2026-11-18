@@ -81,7 +81,10 @@ You start with **$0, bare hands, and an overgrown garden**:
   before you own a shovel.
 
 Your first minute goes: pull weeds → sell → buy Daisy seeds ($3) → plant → water with dew →
-harvest → sell for profit → buy a **Shovel** (you each need one) → expand. A Daisy triples your
+harvest → sell for profit → buy a **Shovel** (you each need one) → expand. The first four steps
+are a **Getting started checklist** at the bottom center of the screen. Each item ticks off as
+soon as it's done (in any order), the next unchecked one is highlighted, and the list goes away
+once all four are checked. A Daisy triples your
 money; by Day 3 you'll want higher-tier seeds, which pay far more per plot.
 
 ---
@@ -151,29 +154,39 @@ Pumpkin ~$330 (a ×3.5 Giant Pumpkin sells for $3,150).
 
 ## 4b. The Market (walk-in store)
 
-There are no shop menus. The north strip of the garden is a **market** of five shops. Each shop
-sells **one kind of thing**, as a row of stalls under one **menu board**: a colored header with the
-shop's name, and one panel per item showing its icon, price and name. Every item has its own stall
-with the real item on the table. Walk up to a stall and a card shows what it does, what A and X do,
+There are no shop menus. The north strip of the garden is a **market shaped like one big
+flower**. The 💰 Quick Sell kiosk is its center, and each of the five shops is a **petal** fanning
+out from it. Every item simply **floats in the air** over a soft spot of its shop's color, spinning
+slowly, with a **price tag** above it showing its icon and price (`🍓 $6`). Nothing blocks: gnomes
+walk freely between the items, and **the item you stand at (or face) is the one you're
+browsing**; it gets a ring-and-**$** target marker. A card then shows what it does, what A and X do,
 and a few quick facts (for seeds: what it sells for, whether it regrows, how fast it grows).
 
-**Stalls are always in order**: left to right by the day they arrive, then by price. So within a
-shop, further right always means later and better. (The order is computed from the item list in
-`config.js`; it can't drift.) There are **no upgrades**: progress comes from buying better items.
+**Starter items sit at the base of each petal, next to the kiosk, and later, better ones toward
+its tip** (sorted by the day they arrive, then by price). The layout is computed from the item
+list in `config.js`, so it can't drift. There are **no upgrades**: progress comes from buying
+better items.
 
-The market has three rows, all facing the garden, each reached from its south side:
+```
+                gear      care
+              g g g      c c        p                     ← north (fence)
+          g g g g      c        p p                         petals fan out from the kiosk;
+      seeds   g g g            p p     gadgets              2 items across, base → tip
+    s s s s     g             p      g g g
+      s s s s  s     [K]        g g g g g
+                   Quick Sell
+```
 
-| Row | Shop | Sells (left → right) |
+| Petal | Shop | Sells (base → tip) |
 |---|---|---|
-| Front | 🌱 **Seeds** | Daisy, Strawberry, Carrot, Marigold, Sunflower, Tomato, Flytrap, Corn, Rose, Watermelon, Giant Pumpkin |
-| | 🧪 **Plant Care** | Soil Bag, Fertilizer, Sun Jar, Heart Mulch |
-| Middle | 🧰 **Garden Gear** | Shovel, Watering Can, Satchel, Backpack, Steel Shovel, Golden Can, Garden Hose, Soap Hose, Wheelbarrow |
-| | 🎯 **Pest Control** | Fly Swatter, Soap Sprayer, Slingshot, Spud Gun, Hot Spud Gun, Seed Blaster |
-| Back | ⛲ **Gadgets** | Fence, Beer Trap, Rain Barrel, Compost Bin, Scarecrow, Sun Lamp, Sprinkler, Ladybug House, Bug Zapper, Beehive, Sell Stand |
+| West | 🌱 **Seeds** | Daisy, Strawberry, Carrot, Marigold, Sunflower, Tomato, Flytrap, Corn, Rose, Watermelon, Giant Pumpkin |
+| North-west | 🧰 **Garden Gear** | Shovel, Watering Can, Satchel, Backpack, Steel Shovel, Golden Can, Garden Hose, Soap Hose, Wheelbarrow |
+| North | 🧪 **Plant Care** | Soil Bag, Fertilizer, Sun Jar, Heart Mulch |
+| North-east | 🎯 **Pest Control** | Fly Swatter, Soap Sprayer, Slingshot, Spud Gun, Hot Spud Gun, Seed Blaster |
+| East | ⛲ **Gadgets** | Fence, Beer Trap, Rain Barrel, Compost Bin, Scarecrow, Sun Lamp, Sprinkler, Ladybug House, Bug Zapper, Beehive, Sell Stand |
 
-The front row (seeds and plant care, the most-visited stalls) is reached straight from the
-garden, with the Quick Sell kiosk between its two shops. Garden Gear and Pest Control are both
-per-gnome gear. Gadgets are shared things you place in the garden.
+Each petal has a colored, petal-shaped patch on the floor and one **floating sign** with the shop's
+name near its tip.
 
 - **A buys** one. **X sells that item back** right there: a seed stall also buys that plant's
   produce, gadget and plant-care stalls buy back their goods (half price), tool and bag stalls buy
@@ -181,19 +194,23 @@ per-gnome gear. Gadgets are shared things you place in the garden.
 - **Better versions trade in.** A better tool (Steel Shovel, Golden Can, Soap Hose, Hot Spud Gun)
   or a bigger bag replaces the one you have, and you get **half its price back**. The card shows
   the trade-in. You can't buy a worse version of something you already have.
-- **Price panels:** yellow price = you can afford it, orange = not yet. **Day N** = arrives on that
-  day (the table stays empty until then). **🔥 ×2** = today's Hot Item.
-- **★ NEW:** anything that unlocked after Day 1 gets a floating **★ NEW** tag over its stall, and
-  the shop header counts them (`★ 2 NEW`), until a gnome walks up and looks at it.
-- A board **fades out** while a gnome stands in the aisle behind it, so you never lose sight of
-  your gnome.
+- **Price tags:** icon and price. Yellow price = you can afford it, orange = not yet.
+  **🔥 ×2** = today's Hot Item.
+- **Everything is on display from Day 1.** Items that haven't arrived yet are shown **faded out
+  (20 % opacity)** with their tag, and can't be bought: the card says which day they arrive.
+- **★ NEW:** anything that unlocked after Day 1 gets a **★ NEW** badge on its price tag, and the
+  shop's sign counts them (`★2`), until a gnome walks up and looks at it.
 - **💰 Quick Sell kiosk** in the middle of the market buys *anything*, so you never have to go
   inside just to dump weeds and junk. It also holds the coin jar raccoons are after.
 - **Sell Stand** gadget: your own quick-sell spot anywhere in the garden.
-- **At dusk the market closes**: shop headers say CLOSED and nothing is sold until dawn (the Quick
+- **At dusk the market closes**: shop signs say CLOSED, the price tags dim, and nothing is sold until dawn (the Quick
   Sell kiosk stays open).
 
 ### Visual language
+
+- **Target markers** (on the ground, in your color) show what A / X will act on: a **square** for
+  a whole cell (tilling, planting, soil, placing a gadget, a fence), a **ring** for round things
+  (plants, weeds, gadgets, pickups, sized to the thing), and a **ring with a $** for a shop item.
 
 - **Icons** for tools, gadgets and supplies are rendered from the item's own 3D model with a white
   sticker outline, so the icon on the board, the card, your HUD and the item in the world all
@@ -204,7 +221,26 @@ per-gnome gear. Gadgets are shared things you place in the garden.
   the same color as the ground.
 - A carried **gadget kit** shows a mini version of the gadget; a **seed packet** shows its plant.
 
-## 4c. Camera
+## 4c. Collision (hitboxes)
+
+Gnomes bump into things by their **real shape**, not by the 2 m grid cell they sit on:
+
+| Thing | Hitbox |
+|---|---|
+| 🌸 Heart Bloom | round, **0.9 m** radius (its stem and leaves), growing with the Heart. Its 2.3 m "reach" is only for watering and pests biting it |
+| Pond | round, the water's edge |
+| Spigot | round, 0.35 m |
+| Fence | a thin wall, 2 m × 0.36 m |
+| Rain Barrel / Sun Lamp / Scarecrow / Ladybug House / Bug Zapper | round, 0.3–0.6 m (the pole or barrel) |
+| Compost Bin / Beehive / Sell Stand | boxes the size of the model |
+| Market items | none: walk between them |
+| Quick Sell kiosk, forest | grid cells |
+
+Round things push a gnome out sideways instead of stopping it, so you **slide around** the Heart,
+the pond and poles instead of snagging. Pests still treat a blocking gadget as filling its whole
+cell (that's what makes fences work against deer).
+
+## 4d. Camera
 
 The shared camera frames every gnome **and anything that needs a gnome's attention**, zooming out
 as far as needed:
@@ -338,10 +374,30 @@ N2 moths, N3 deer, N4 raccoons, N10/20/30… Moon Stag.
 
 ## 11. Weather & Daily Variety
 
-- **Clear:** normal.
-- **Rain:** waters everything slowly, half sunlight, no dew.
-- **Heatwave:** water evaporates twice as fast, full sun.
+One weather per day, picked at dawn (Days 1–2 are always clear). It **fades in over about 12 s**,
+and every effect (sky, light, particles and gameplay) is blended by how far it has faded in, so
+nothing switches abruptly.
+
+| Weather | How often | Effect | Look |
+|---|---|---|---|
+| 🌤️ Clear | 55 % | normal | — |
+| 🌧️ Rain | 16 % | waters plants and soil, half sun, no dew | grey sky, rain streaks |
+| 🔥 Heatwave | 11 % | water dries up about twice as fast | warm sky |
+| 🌫️ Fog | 10 % | soft sun (×0.7), **double dew** | pale sky, fog closes in around the view |
+| ❄️ Snow | 8 % | cold: growth ×0.6 but water barely dries up (×0.3), less sun, no dew | white sky, drifting snowflakes |
+
 - **Hot Item:** one crop sells for ×2 that day.
+
+### Day/night wheel & sky
+
+- The top bar has a **day/night wheel**: the top half of a dial with a day arc (☀️) and a night
+  arc (🌙), sized to their real lengths, turning under a fixed pointer. Today's weather icon sits
+  in the hub at the bottom.
+- The top bar is built once with **fixed-width fields** (numbers use tabular digits), so nothing in
+  it moves or resizes as values change.
+- The sky, sun, moon, ambient light and stars are **continuous** through dawn and dusk. The sun and
+  moon each fade out at the horizon, so the switch between them (and the shadow direction) is never
+  visible. Shadows are snapped to shadow-map texels so they don't shimmer when the camera moves.
 
 ---
 

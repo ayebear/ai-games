@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CELL, GRID, HALF, FOREST, POND, SOIL, HEART_R, MARKET, STALLS, SPIGOT } from './config.js';
-import { G, rand, clamp } from './state.js';
+import { CELL, GRID, HALF, FOREST, POND, SOIL, HEART_R, HEART_HIT, SPIGOT_HIT, MARKET, SPIGOT } from './config.js';
+import { G, rand, clamp, wx } from './state.js';
 import { makeWeed, makeItem, makePickupRing, mat, BOX, P } from './models.js';
 
 export class World {
@@ -18,26 +18,48 @@ export class World {
           else type = 'market'; // walkable floor; no tilling, weeds or gadgets
         } else if (i >= MARKET.plaza.i0 && i <= MARKET.plaza.i1 && j === MARKET.plaza.j) type = 'plaza'; // in front of the quick-sell counter
         else if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 0.4) type = 'water';
-        else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'solid'; // heart bloom
+        else if ((i === 14 || i === 15) && (j === 14 || j === 15)) type = 'fixture'; // heart bloom (round collider below)
         this.cells.push({ i, j, x, z, type, soil: 0, wet: 0, plant: null, placeable: null, weed: null, plot: null });
       }
     }
-    for (const st of STALLS) this.cell(st.i, st.j).type = 'solid';
-    this.cellAt(SPIGOT.x, SPIGOT.z).type = 'solid';
+    this.cellAt(SPIGOT.x, SPIGOT.z).type = 'fixture'; // no tilling or gadgets; round collider below
   }
 
   cell(i, j) { return i < 0 || j < 0 || i >= GRID || j >= GRID ? null : this.cells[j * GRID + i]; }
   cellAt(x, z) { return this.cell(Math.floor((x + HALF) / CELL), Math.floor((z + HALF) / CELL)); }
 
-  // Can a gnome stand at x,z (with radius r)?
+  // Gnome collision. The grid only blocks the forest and the kiosk; everything else uses its real
+  // shape. Boxes block movement (walkable); circles push the gnome out sideways (pushOut), so it
+  // slides smoothly around round things instead of snagging on them.
+  circles() {
+    const out = [
+      { x: 0, z: 0, r: HEART_HIT * (G.heart?.model.group.scale.x ?? 1) },
+      { x: SPIGOT.x, z: SPIGOT.z, r: SPIGOT_HIT },
+      { x: POND.x, z: POND.z, r: POND.r - 0.3 },
+    ];
+    for (const p of G.placeables) if (!p.dead && p.def.blocks && !Array.isArray(p.def.hit)) out.push({ x: p.pos.x, z: p.pos.z, r: p.def.hit ?? 0.6 });
+    return out;
+  }
   walkable(x, z, r = 0.4) {
     for (const [dx, dz] of [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]]) {
       const c = this.cellAt(x + dx, z + dz);
-      if (!c || c.type === 'forest' || c.type === 'solid' || c.type === 'water') return false;
-      if (c.placeable && c.placeable.def.blocks) return false;
+      if (!c || c.type === 'forest' || c.type === 'solid') return false;
     }
-    if (Math.hypot(x, z) < HEART_R - 0.2) return false;
+    for (const p of G.placeables) {
+      const h = p.def.hit;
+      if (p.dead || !p.def.blocks || !Array.isArray(h)) continue;
+      if (Math.abs(x - p.pos.x) < h[0] / 2 + r && Math.abs(z - p.pos.z) < h[1] / 2 + r) return false;
+    }
     return true;
+  }
+  // Move pos (a Vector3) out of any circle it overlaps.
+  pushOut(pos, r = 0.4) {
+    for (const c of this.circles()) {
+      const dx = pos.x - c.x, dz = pos.z - c.z, d = Math.hypot(dx, dz), min = c.r + r;
+      if (d >= min) continue;
+      const k = d > 1e-4 ? min / d : 0;
+      if (k) { pos.x = c.x + dx * k; pos.z = c.z + dz * k; } else pos.z = c.z + min;
+    }
   }
 
   // ── Plots ──
@@ -92,8 +114,7 @@ export class World {
       }
       if (c.type === 'plot') {
         const before = c.wet;
-        const rain = G.weather === 'rain' ? 0.03 : 0;
-        c.wet = clamp(c.wet - dt * (G.weather === 'heat' ? 0.03 : 0.015) + rain * dt, 0, 1);
+        c.wet = clamp(c.wet - dt * 0.015 * wx('drain') + 0.03 * wx('rain') * dt, 0, 1);
         if (c.plant) c.wet = Math.max(c.wet, clamp((c.plant.water - 0.3) * 1.2, 0, 1));
         if (Math.abs(before - c.wet) > 0.002 || Math.random() < 0.01) this.refreshPlot(c);
       }
